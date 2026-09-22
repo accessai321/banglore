@@ -115,8 +115,9 @@ export default function Landing() {
   const [debugResult, setDebugResult] = useState("None");
 
   const selectedRef = useRef(null);
+  const hasSpokenRef = useRef(false);
 
-  const textToSpeak = "Hello. I am AccessAI. Please say Blind Mode or Motor Mode.";
+  const textToSpeak = "Hello! I am AccessAI. Please say Blind Mode, Deaf Mode, or Motor Mode, or choose an option to begin.";
 
   const setSelectedWithRef = useCallback((val) => {
     selectedRef.current = val;
@@ -134,7 +135,10 @@ export default function Landing() {
     globalResumeListening();
   }, [globalResumeListening, setAgentState]);
 
-  const handleOrbClick = useCallback(() => {
+  const playGreeting = useCallback((force = false) => {
+    if (hasSpokenRef.current && !force) return;
+    hasSpokenRef.current = true;
+
     setAgentState(STATE_SPEAKING);
     setDebugStatus("Speaking...");
     stop();
@@ -145,13 +149,46 @@ export default function Landing() {
         resumeListening();
       }, 100);
     });
-  }, [speakText, resumeListening, stop, setAgentState]);
+  }, [speakText, resumeListening, stop, setAgentState, textToSpeak]);
 
-  // Trigger greeting automatically on page load
+  const handleOrbClick = useCallback(() => {
+    playGreeting(true);
+  }, [playGreeting]);
+
+  // Trigger greeting automatically on page load + first user gesture fallback (bypasses browser autoplay policy)
   useEffect(() => {
-    handleOrbClick();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Attempt immediate speech on load
+    const loadTimer = setTimeout(() => {
+      playGreeting(false);
+    }, 200);
+
+    // If browser autoplay policies block background speech synthesis until user interacts,
+    // ensure the very first interaction triggers speech immediately
+    const handleFirstGesture = () => {
+      if (window.speechSynthesis && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      playGreeting(false);
+      removeGestureListeners();
+    };
+
+    const removeGestureListeners = () => {
+      window.removeEventListener("click", handleFirstGesture);
+      window.removeEventListener("keydown", handleFirstGesture);
+      window.removeEventListener("touchstart", handleFirstGesture);
+      window.removeEventListener("pointerdown", handleFirstGesture);
+    };
+
+    window.addEventListener("click", handleFirstGesture, { once: true });
+    window.addEventListener("keydown", handleFirstGesture, { once: true });
+    window.addEventListener("touchstart", handleFirstGesture, { once: true });
+    window.addEventListener("pointerdown", handleFirstGesture, { once: true });
+
+    return () => {
+      clearTimeout(loadTimer);
+      removeGestureListeners();
+    };
+  }, [playGreeting]);
 
   const selectMode = useCallback((modeKey, playTTS = true) => {
     setSelectedWithRef(modeKey);
@@ -448,17 +485,6 @@ export default function Landing() {
     return null;
   }, [selectBlindMode, selectMotorMode, openLogin, openSignup, speakText, resumeListening, setSelectedWithRef, setAgentState, handleOrbClick, navigate]);
 
-  const startGreeting = useCallback(() => {
-    if (agentState !== STATE_IDLE) return;
-
-    setAgentState(STATE_GREETING);
-    setDebugStatus("Greeting...");
-    speakText(textToSpeak, () => {
-      setTimeout(() => {
-        resumeListening();
-      }, 100);
-    });
-  }, [speakText, resumeListening, agentState, setAgentState]);
 
   // Speech Recognition Context Registration
   useEffect(() => {
@@ -493,27 +519,7 @@ export default function Landing() {
     return unregister;
   }, [registerContext, normalizeTranscript, detectIntent, speakText, resumeListening, setAgentState, setTranscript]);
 
-  // Autoplay greeting on mount or click fallback
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      startGreeting();
-    }, 1000);
 
-    const handleUserInteraction = () => {
-      startGreeting();
-      window.removeEventListener("click", handleUserInteraction);
-      window.removeEventListener("keydown", handleUserInteraction);
-    };
-
-    window.addEventListener("click", handleUserInteraction);
-    window.addEventListener("keydown", handleUserInteraction);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("click", handleUserInteraction);
-      window.removeEventListener("keydown", handleUserInteraction);
-    };
-  }, [startGreeting]);
 
 
 

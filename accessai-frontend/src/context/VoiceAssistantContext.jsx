@@ -34,8 +34,18 @@ export function VoiceAssistantProvider({ children }) {
     }
   }, []);
 
+  // Pre-load synthesis voices for browsers (Chrome/Edge/Safari)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+  }, []);
+
   const speak = useCallback((text, onEndCallback) => {
-    if (!window.speechSynthesis) {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
       if (onEndCallback) onEndCallback();
       return;
     }
@@ -53,31 +63,51 @@ export function VoiceAssistantProvider({ children }) {
 
     setAgentState("SPEAKING");
 
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.92;
-    utt.pitch = 1;
-    utt.volume = 1;
+    // Allow a 50ms buffer for browser audio subsystem to finish cancel()
+    setTimeout(() => {
+      try {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.rate = 0.95;
+        utt.pitch = 1;
+        utt.volume = 1;
 
-    const cleanup = () => {
-      utteranceRef.current = null;
-      setAgentState("IDLE");
-      if (onEndCallback) onEndCallback();
-      // Resume listening if active
-      if (voiceActiveRef.current) {
-        setTimeout(resumeListening, 100);
+        const voices = window.speechSynthesis.getVoices();
+        const englishVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha") || v.name.includes("Zira"))) || voices.find(v => v.lang.startsWith("en"));
+        if (englishVoice) {
+          utt.voice = englishVoice;
+        }
+
+        let isDone = false;
+        const cleanup = () => {
+          if (isDone) return;
+          isDone = true;
+          utteranceRef.current = null;
+          window.__activeUtterance = null;
+          setAgentState("IDLE");
+          if (onEndCallback) onEndCallback();
+          if (voiceActiveRef.current) {
+            setTimeout(resumeListening, 150);
+          }
+        };
+
+        utt.onend = cleanup;
+        utt.onerror = (e) => {
+          console.warn("[VoiceAssistant] Speech synthesis event:", e);
+          cleanup();
+        };
+
+        // Retain reference on window to prevent Chrome garbage-collection bug
+        utteranceRef.current = utt;
+        window.__activeUtterance = utt;
+
+        window.speechSynthesis.resume();
+        window.speechSynthesis.speak(utt);
+      } catch (err) {
+        console.error("[VoiceAssistant] Speak exception:", err);
+        setAgentState("IDLE");
+        if (onEndCallback) onEndCallback();
       }
-    };
-
-    utt.onend = cleanup;
-    utt.onerror = cleanup;
-    utteranceRef.current = utt;
-
-    try {
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utt);
-    } catch (err) {
-      cleanup();
-    }
+    }, 60);
   }, [resumeListening]);
 
   const stop = useCallback(() => {
