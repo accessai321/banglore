@@ -540,7 +540,7 @@ export default function SignAvatarAssistant({
             <div className="flex flex-col flex-1 overflow-y-auto max-h-[72vh]">
               
               {/* 3D WebGL Avatar Mini Stage */}
-              <div className="w-full h-44 relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-b border-cyan-500/20 flex flex-col justify-between p-2 overflow-hidden">
+              <div className="w-full h-52 relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-b border-cyan-500/20 flex flex-col justify-between p-2 overflow-hidden">
                 {/* Status Indicator */}
                 <div className="w-full flex items-center justify-between z-10">
                   <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/85 border border-cyan-500/30 text-[10px]">
@@ -567,7 +567,7 @@ export default function SignAvatarAssistant({
                 </div>
 
                 {/* Embedded Three.js 3D Avatar */}
-                <div className="w-full h-32 relative flex items-center justify-center -my-2">
+                <div className="w-full h-44 relative flex items-center justify-center -my-1">
                   <Avatar3DCanvas
                     avatarAction={avatarAction}
                     isSpeaking={isSpeaking}

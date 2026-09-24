@@ -550,7 +550,7 @@ export default function DeafDashboard() {
             <div className={`${cardClass} p-4 rounded-2xl flex flex-col md:flex-row gap-4`}>
               <div className="flex-1 relative">
                 <span className="material-symbols-outlined absolute left-3 top-3 text-slate-400">search</span>
-                <input
+                <input  
                   type="text"
                   placeholder="Search courses by keyword..."
                   value={search}
