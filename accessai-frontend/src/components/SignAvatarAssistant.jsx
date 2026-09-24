@@ -76,6 +76,64 @@ const SIGN_COMMANDS = [
   }
 ];
 
+// Interactive Teacher Mode Curriculum (English & ASL Vocabulary)
+const TEACHER_LESSONS = [
+  {
+    id: "ok",
+    word: "OK / Understood",
+    englishMeaning: "Indicates agreement, readiness, or comprehension",
+    aslGesture: "OK_Sign",
+    icon: "👌",
+    hint: "Touch thumb and index tips in a circle. Keep other 3 fingers straight up.",
+    avatarDemoPose: "sign_ok"
+  },
+  {
+    id: "hello",
+    word: "Hello / Welcome",
+    englishMeaning: "Friendly greeting to start conversation or class",
+    aslGesture: "Open_Palm",
+    icon: "✋",
+    hint: "Open your palm flat facing camera and wave gently.",
+    avatarDemoPose: "wave"
+  },
+  {
+    id: "yes",
+    word: "Yes / Confirmed",
+    englishMeaning: "Affirmative agreement or item selection",
+    aslGesture: "Thumb_Up",
+    icon: "👍",
+    hint: "Form a solid fist and point your thumb straight up.",
+    avatarDemoPose: "thumbs_up"
+  },
+  {
+    id: "peace",
+    word: "Peace / Number Two",
+    englishMeaning: "Victory, harmony, or the number 2 in ASL",
+    aslGesture: "Victory",
+    icon: "✌️",
+    hint: "Extend your index and middle fingers into a clean V shape.",
+    avatarDemoPose: "wave"
+  },
+  {
+    id: "love",
+    word: "I Love You (ASL)",
+    englishMeaning: "Universal expression of care, friendship, and support",
+    aslGesture: "ILoveYou",
+    icon: "🤟",
+    hint: "Extend your thumb, index finger, and pinky simultaneously.",
+    avatarDemoPose: "sign_learn"
+  },
+  {
+    id: "courses",
+    word: "Courses / Study",
+    englishMeaning: "Focus on educational materials and lessons",
+    aslGesture: "Pointing_Up",
+    icon: "☝️",
+    hint: "Point index finger straight up toward learning modules.",
+    avatarDemoPose: "point_courses"
+  }
+];
+
 export default function SignAvatarAssistant({
   onNavigate,
   onOpenSignPractice,
@@ -85,7 +143,12 @@ export default function SignAvatarAssistant({
 }) {
   const [isOpen, setIsOpen] = useState(true); // Floating window open/close state
   const [isMinimized, setIsMinimized] = useState(false); // Mini mode vs full window
-  const [activeTab, setActiveTab] = useState("camera"); // 'camera' | 'chat' | 'guide'
+  const [activeTab, setActiveTab] = useState("teacher"); // 'teacher' | 'camera' | 'chat' | 'guide'
+  
+  // Teacher Mode State
+  const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
+  const [teacherXP, setTeacherXP] = useState(60);
+  const [lessonCompleted, setLessonCompleted] = useState(false);
   
   const [cameraActive, setCameraActive] = useState(false);
   const [modelLoading, setModelLoading] = useState(true);
@@ -128,6 +191,17 @@ export default function SignAvatarAssistant({
   const HOLD_DURATION_MS = 600; // Hold sign for 0.6s to trigger
   const lastTriggeredTimeRef = useRef(0);
   const COOLDOWN_MS = 2000; // 2s cooldown between commands to prevent rapid firing
+
+  // Teacher Mode Dynamic Tracking Refs
+  const activeTabRef = useRef(activeTab);
+  const currentLessonIdxRef = useRef(currentLessonIdx);
+  const lessonCompletedRef = useRef(lessonCompleted);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    currentLessonIdxRef.current = currentLessonIdx;
+    lessonCompletedRef.current = lessonCompleted;
+  }, [activeTab, currentLessonIdx, lessonCompleted]);
 
   // Initialize MediaPipe Gesture Recognizer
   useEffect(() => {
@@ -204,6 +278,25 @@ export default function SignAvatarAssistant({
       });
     }
   }, [cameraActive]);
+
+  // Teacher Mode Demonstration Helper
+  const demoTeacherLesson = useCallback((lesson) => {
+    if (!lesson) return;
+    setCaptionText(`Nova: Watch my hand demonstration for "${lesson.word}"!`);
+    setAvatarAction(lesson.avatarDemoPose);
+    setIsSpeaking(true);
+    setTimeout(() => {
+      setIsSpeaking(false);
+    }, 2500);
+  }, []);
+
+  // When switching lessons or entering teacher tab, Nova automatically demonstrates sign
+  useEffect(() => {
+    if (activeTab === "teacher") {
+      setLessonCompleted(false);
+      demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx]);
+    }
+  }, [activeTab, currentLessonIdx, demoTeacherLesson]);
 
   // Avatar speech and captions helper
   const triggerAvatarResponse = useCallback((caption, avatarPose = "nod", speechVoiceText = "") => {
@@ -410,31 +503,73 @@ export default function SignAvatarAssistant({
         setDetectedGesture(gestureName);
         setDetectedConfidence(Math.round(score * 100));
 
-        // Check if detected gesture maps to a command
-        const matchedCmd = SIGN_COMMANDS.find((c) => c.gesture === gestureName);
         const now = Date.now();
 
-        if (matchedCmd && (now - lastTriggeredTimeRef.current > COOLDOWN_MS)) {
-          if (currentHoldingGestureRef.current === gestureName) {
-            const elapsed = now - holdStartTimeRef.current;
-            const progress = Math.min(100, Math.round((elapsed / HOLD_DURATION_MS) * 100));
-            setHoldProgress(progress);
+        // ── Branch A: Teacher Mode (Interactive Lesson Sign Evaluation) ──
+        if (activeTabRef.current === "teacher") {
+          const currentTarget = TEACHER_LESSONS[currentLessonIdxRef.current];
+          const isTargetMatched = currentTarget && gestureName === currentTarget.aslGesture;
 
-            if (elapsed >= HOLD_DURATION_MS) {
-              executeSignAction(matchedCmd);
-              currentHoldingGestureRef.current = "None";
-              holdStartTimeRef.current = 0;
+          if (isTargetMatched && !lessonCompletedRef.current) {
+            if (currentHoldingGestureRef.current === gestureName) {
+              const elapsed = now - holdStartTimeRef.current;
+              const progress = Math.min(100, Math.round((elapsed / HOLD_DURATION_MS) * 100));
+              setHoldProgress(progress);
+
+              if (elapsed >= HOLD_DURATION_MS) {
+                // Complete teacher lesson!
+                setTeacherXP((prev) => prev + 10);
+                setLessonCompleted(true);
+                lessonCompletedRef.current = true;
+                setAvatarMood("executing");
+                currentHoldingGestureRef.current = "None";
+                holdStartTimeRef.current = 0;
+                setHoldProgress(0);
+
+                triggerAvatarResponse(
+                  `🎉 Excellent! Mastered "${currentTarget.word}" (+10 XP)!`,
+                  "thumbs_up",
+                  `Excellent! You mastered ${currentTarget.word}. Ten XP awarded.`
+                );
+              }
+            } else {
+              currentHoldingGestureRef.current = gestureName;
+              holdStartTimeRef.current = now;
+              setHoldProgress(15);
+              setAvatarMood("recognized");
             }
           } else {
-            currentHoldingGestureRef.current = gestureName;
-            holdStartTimeRef.current = now;
-            setHoldProgress(10);
-            setAvatarMood("recognized");
+            if (currentHoldingGestureRef.current !== "None" && !lessonCompletedRef.current) {
+              currentHoldingGestureRef.current = "None";
+              setHoldProgress(0);
+            }
           }
         } else {
-          if (currentHoldingGestureRef.current !== "None") {
-            currentHoldingGestureRef.current = "None";
-            setHoldProgress(0);
+          // ── Branch B: Standard Dashboard Navigation & Control ──
+          const matchedCmd = SIGN_COMMANDS.find((c) => c.gesture === gestureName);
+
+          if (matchedCmd && (now - lastTriggeredTimeRef.current > COOLDOWN_MS)) {
+            if (currentHoldingGestureRef.current === gestureName) {
+              const elapsed = now - holdStartTimeRef.current;
+              const progress = Math.min(100, Math.round((elapsed / HOLD_DURATION_MS) * 100));
+              setHoldProgress(progress);
+
+              if (elapsed >= HOLD_DURATION_MS) {
+                executeSignAction(matchedCmd);
+                currentHoldingGestureRef.current = "None";
+                holdStartTimeRef.current = 0;
+              }
+            } else {
+              currentHoldingGestureRef.current = gestureName;
+              holdStartTimeRef.current = now;
+              setHoldProgress(10);
+              setAvatarMood("recognized");
+            }
+          } else {
+            if (currentHoldingGestureRef.current !== "None") {
+              currentHoldingGestureRef.current = "None";
+              setHoldProgress(0);
+            }
           }
         }
       } else {
@@ -636,17 +771,21 @@ export default function SignAvatarAssistant({
                 </div>
               </div>
 
-              {/* Bot Navigation Tabs: [Sign Camera] | [Chat History] | [Sign Guide] */}
+              {/* Bot Navigation Tabs: [Teacher Mode] | [Sign Camera] | [Chat History] | [Sign Guide] */}
               <div className="flex border-b border-slate-800 bg-slate-900/80 px-2 pt-1 gap-1">
                 {[
-                  { id: "camera", label: "Sign Camera", icon: "videocam" },
-                  { id: "chat", label: "Captions & History", icon: "forum" },
-                  { id: "guide", label: "Sign Guide", icon: "menu_book" }
+                  { id: "teacher", label: "Teacher", icon: "school" },
+                  { id: "camera", label: "Camera", icon: "videocam" },
+                  { id: "chat", label: "Chat", icon: "forum" },
+                  { id: "guide", label: "Guide", icon: "menu_book" }
                 ].map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setActiveTab(t.id)}
+                    onClick={() => {
+                      setActiveTab(t.id);
+                      if (t.id === "teacher" && !cameraActive) startCamera();
+                    }}
                     className={`flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1.5 rounded-t-xl transition-all border-b-2 ${
                       activeTab === t.id
                         ? "text-cyan-400 border-cyan-400 bg-slate-800/80"
@@ -658,6 +797,136 @@ export default function SignAvatarAssistant({
                   </button>
                 ))}
               </div>
+
+              {/* Tab 0: Interactive Teacher Mode (Nova as Sign & English Tutor) */}
+              {activeTab === "teacher" && (
+                <div className="p-3.5 flex flex-col gap-3 min-h-[300px] max-h-[390px] overflow-y-auto">
+                  {/* Lesson Level & XP Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-cyan-400 font-bold text-xs uppercase tracking-wider">
+                        Lesson {currentLessonIdx + 1} of {TEACHER_LESSONS.length}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
+                        ASL & English
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-sm">
+                      <span className="text-amber-400">⭐</span>
+                      <span>{teacherXP} XP</span>
+                    </div>
+                  </div>
+
+                  {/* Current Lesson Interactive Card */}
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-cyan-500/30 flex flex-col gap-2 shadow-lg relative overflow-hidden">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-3xl p-1.5 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
+                          {TEACHER_LESSONS[currentLessonIdx].icon}
+                        </span>
+                        <div>
+                          <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                            <span>{TEACHER_LESSONS[currentLessonIdx].word}</span>
+                          </div>
+                          <p className="text-[11px] text-cyan-300">
+                            {TEACHER_LESSONS[currentLessonIdx].englishMeaning}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx])}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                        title="Watch Nova demonstrate this sign"
+                      >
+                        <span className="material-symbols-outlined !text-xs">play_circle</span>
+                        <span>Demo</span>
+                      </button>
+                    </div>
+
+                    {/* Hint Box */}
+                    <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-1.5">
+                      <span className="text-amber-400 text-xs">💡</span>
+                      <span>{TEACHER_LESSONS[currentLessonIdx].hint}</span>
+                    </div>
+
+                    {/* Status & Live Match Indicator */}
+                    <div className="pt-1 flex flex-col gap-1.5">
+                      {lessonCompleted ? (
+                        <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-400 text-emerald-200 text-xs flex flex-col items-center gap-2 text-center animate-fadeIn">
+                          <div className="flex items-center gap-1.5 font-bold text-sm">
+                            <span>🎉 Mastered! +10 XP Added</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLessonCompleted(false);
+                                demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx]);
+                              }}
+                              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold"
+                            >
+                              Practice Again
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextIdx = (currentLessonIdx + 1) % TEACHER_LESSONS.length;
+                                setCurrentLessonIdx(nextIdx);
+                                setLessonCompleted(false);
+                              }}
+                              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-md shadow-cyan-500/30 flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Next Sign</span>
+                              <span className="material-symbols-outlined !text-xs">arrow_forward</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-[11px] p-2 rounded-xl bg-slate-950/60 border border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${
+                              detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture
+                                ? "bg-emerald-400 animate-ping"
+                                : "bg-slate-500"
+                            }`} />
+                            <span className="text-slate-300 font-semibold">
+                              {detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture
+                                ? `Holding sign... (${holdProgress}%)`
+                                : `Show: "${TEACHER_LESSONS[currentLessonIdx].word}"`}
+                            </span>
+                          </div>
+                          {detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture ? (
+                            <span className="text-emerald-400 font-bold text-[10px]">Matching!</span>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">
+                              {detectedGesture !== "None" ? `Detected: ${detectedGesture}` : "Waiting..."}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Camera Toggle if Camera is Off */}
+                  {!cameraActive ? (
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined !text-base">videocam</span>
+                      <span>Turn On Camera to Practice</span>
+                    </button>
+                  ) : (
+                    <div className="text-[10px] text-center text-slate-400 flex items-center justify-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Webcam active • Nova is evaluating your hand signs in real-time</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tab 1: Live Sign Camera & Quick Actions */}
               {activeTab === "camera" && (
@@ -763,7 +1032,30 @@ export default function SignAvatarAssistant({
 
               {/* Tab 2: Captions & History Chat Feed */}
               {activeTab === "chat" && (
-                <div className="p-4 flex flex-col gap-3 min-h-[260px] max-h-[340px] overflow-y-auto">
+                <div className="p-3.5 flex flex-col gap-3 min-h-[260px] max-h-[350px] overflow-y-auto">
+                  {/* Quick Student Prompts */}
+                  <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800 overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("teacher");
+                        if (!cameraActive) startCamera();
+                      }}
+                      className="px-2.5 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-300 text-[10px] font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <span>🎓</span>
+                      <span>Teach Me Signs</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate && onNavigate("courses")}
+                      className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 text-[10px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <span>📚</span>
+                      <span>Go to Courses</span>
+                    </button>
+                  </div>
+
                   {chatHistory.map((msg) => (
                     <div
                       key={msg.id}
