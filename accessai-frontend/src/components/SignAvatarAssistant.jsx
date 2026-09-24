@@ -798,76 +798,80 @@ export default function SignAvatarAssistant({
                 ))}
               </div>
 
-              {/* Tab 0: Interactive Teacher Mode (Nova as Sign & English Tutor) */}
-              {activeTab === "teacher" && (
-                <div className="p-3.5 flex flex-col gap-3 min-h-[300px] max-h-[390px] overflow-y-auto">
-                  {/* Lesson Level & XP Header */}
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-cyan-400 font-bold text-xs uppercase tracking-wider">
-                        Lesson {currentLessonIdx + 1} of {TEACHER_LESSONS.length}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-                        ASL & English
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-sm">
-                      <span className="text-amber-400">⭐</span>
-                      <span>{teacherXP} XP</span>
-                    </div>
-                  </div>
+              {/* ── Active Video & Vision Hub (Mounted in DOM for Teacher & Camera modes) ── */}
+              <div className={`p-3.5 flex flex-col gap-3 min-h-[300px] max-h-[440px] overflow-y-auto ${
+                activeTab === "teacher" || activeTab === "camera" ? "block" : "hidden"
+              }`}>
 
-                  {/* Current Lesson Interactive Card */}
-                  <div className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-cyan-500/30 flex flex-col gap-2 shadow-lg relative overflow-hidden">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-3xl p-1.5 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
-                          {TEACHER_LESSONS[currentLessonIdx].icon}
+                {/* ── Tab 0 Content: Teacher Mode Curriculum & Lesson Card ── */}
+                {activeTab === "teacher" && (
+                  <div className="flex flex-col gap-2.5">
+                    {/* Lesson Level & XP Header */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-cyan-400 font-bold text-xs uppercase tracking-wider">
+                          Lesson {currentLessonIdx + 1} of {TEACHER_LESSONS.length}
                         </span>
-                        <div>
-                          <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                            <span>{TEACHER_LESSONS[currentLessonIdx].word}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
+                          ASL & English
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-sm">
+                        <span className="text-amber-400">⭐</span>
+                        <span>{teacherXP} XP</span>
+                      </div>
+                    </div>
+
+                    {/* Current Lesson Interactive Card */}
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-cyan-500/30 flex flex-col gap-2 shadow-lg relative overflow-hidden">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-3xl p-1.5 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
+                            {TEACHER_LESSONS[currentLessonIdx].icon}
+                          </span>
+                          <div>
+                            <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                              <span>{TEACHER_LESSONS[currentLessonIdx].word}</span>
+                            </div>
+                            <p className="text-[11px] text-cyan-300">
+                              {TEACHER_LESSONS[currentLessonIdx].englishMeaning}
+                            </p>
                           </div>
-                          <p className="text-[11px] text-cyan-300">
-                            {TEACHER_LESSONS[currentLessonIdx].englishMeaning}
-                          </p>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx])}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                          title="Watch Nova demonstrate this sign"
+                        >
+                          <span className="material-symbols-outlined !text-xs">play_circle</span>
+                          <span>Demo</span>
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx])}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all"
-                        title="Watch Nova demonstrate this sign"
-                      >
-                        <span className="material-symbols-outlined !text-xs">play_circle</span>
-                        <span>Demo</span>
-                      </button>
-                    </div>
+                      {/* Hint Box */}
+                      <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-1.5">
+                        <span className="text-amber-400 text-xs">💡</span>
+                        <span>{TEACHER_LESSONS[currentLessonIdx].hint}</span>
+                      </div>
 
-                    {/* Hint Box */}
-                    <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-1.5">
-                      <span className="text-amber-400 text-xs">💡</span>
-                      <span>{TEACHER_LESSONS[currentLessonIdx].hint}</span>
-                    </div>
-
-                    {/* Status & Live Match Indicator */}
-                    <div className="pt-1 flex flex-col gap-1.5">
-                      {lessonCompleted ? (
-                        <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-400 text-emerald-200 text-xs flex flex-col items-center gap-2 text-center animate-fadeIn">
-                          <div className="flex items-center gap-1.5 font-bold text-sm">
-                            <span>🎉 Mastered! +10 XP Added</span>
+                      {/* Lesson Mastered Celebration Banner */}
+                      {lessonCompleted && (
+                        <div className="p-2.5 rounded-xl bg-emerald-950/90 border border-emerald-400 text-emerald-200 text-xs flex items-center justify-between gap-2 animate-fadeIn shadow-lg">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <span>🎉 Mastered! +10 XP</span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => {
                                 setLessonCompleted(false);
                                 demoTeacherLesson(TEACHER_LESSONS[currentLessonIdx]);
                               }}
-                              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold"
+                              className="px-2.5 py-1 rounded-lg bg-slate-850 hover:bg-slate-700 text-white text-[10px] font-semibold cursor-pointer border border-slate-700"
                             >
-                              Practice Again
+                              Retry
                             </button>
                             <button
                               type="button"
@@ -876,126 +880,98 @@ export default function SignAvatarAssistant({
                                 setCurrentLessonIdx(nextIdx);
                                 setLessonCompleted(false);
                               }}
-                              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-md shadow-cyan-500/30 flex items-center gap-1 cursor-pointer"
+                              className="px-3.5 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-[11px] font-bold shadow-md shadow-cyan-500/30 flex items-center gap-1 cursor-pointer"
                             >
-                              <span>Next Sign</span>
+                              <span>Next</span>
                               <span className="material-symbols-outlined !text-xs">arrow_forward</span>
                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-between text-[11px] p-2 rounded-xl bg-slate-950/60 border border-slate-800">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${
-                              detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture
-                                ? "bg-emerald-400 animate-ping"
-                                : "bg-slate-500"
-                            }`} />
-                            <span className="text-slate-300 font-semibold">
-                              {detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture
-                                ? `Holding sign... (${holdProgress}%)`
-                                : `Show: "${TEACHER_LESSONS[currentLessonIdx].word}"`}
-                            </span>
-                          </div>
-                          {detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture ? (
-                            <span className="text-emerald-400 font-bold text-[10px]">Matching!</span>
-                          ) : (
-                            <span className="text-slate-500 text-[10px]">
-                              {detectedGesture !== "None" ? `Detected: ${detectedGesture}` : "Waiting..."}
-                            </span>
-                          )}
-                        </div>
                       )}
                     </div>
                   </div>
+                )}
 
-                  {/* Camera Toggle if Camera is Off */}
-                  {!cameraActive ? (
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined !text-base">videocam</span>
-                      <span>Turn On Camera to Practice</span>
-                    </button>
+                {/* ── Permanent Live Video & MediaPipe Skeleton Viewport ── */}
+                <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center group shadow-inner">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover transform -scale-x-100 ${cameraActive ? "block" : "hidden"}`}
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    width={640}
+                    height={480}
+                    className={`absolute inset-0 w-full h-full object-cover transform -scale-x-100 pointer-events-none ${cameraActive ? "block" : "hidden"}`}
+                  />
+
+                  {cameraActive ? (
+                    <>
+                      {/* Live Detection Overlay Status Pill */}
+                      <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-lg bg-slate-900/85 backdrop-blur-md border border-cyan-500/40 text-[11px] text-white flex items-center gap-1.5 shadow-md">
+                        <span className={`w-2 h-2 rounded-full ${
+                          detectedGesture !== "None" ? "bg-emerald-400 animate-pulse" : "bg-slate-400"
+                        }`} />
+                        <span className="font-bold text-cyan-400">
+                          {activeTab === "teacher"
+                            ? (detectedGesture === TEACHER_LESSONS[currentLessonIdx].aslGesture
+                                ? `Matching "${TEACHER_LESSONS[currentLessonIdx].word}"!`
+                                : `Show: ${TEACHER_LESSONS[currentLessonIdx].word}`)
+                            : (detectedGesture !== "None" ? detectedGesture : "Watching signs...")
+                          }
+                        </span>
+                        {detectedConfidence > 0 && (
+                          <span className="text-[9px] px-1 rounded bg-cyan-500/20 text-cyan-300 font-mono">
+                            {detectedConfidence}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stop Camera Button */}
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-red-600/90 hover:bg-red-600 text-white text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-md"
+                      >
+                        <span className="material-symbols-outlined !text-xs">videocam_off</span>
+                        <span>Stop</span>
+                      </button>
+                    </>
                   ) : (
-                    <div className="text-[10px] text-center text-slate-400 flex items-center justify-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>Webcam active • Nova is evaluating your hand signs in real-time</span>
+                    <div className="text-center p-4 flex flex-col items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+                        <span className="material-symbols-outlined !text-2xl">videocam</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 max-w-xs">
+                        {activeTab === "teacher"
+                          ? "Turn on camera to practice sign language with Nova."
+                          : "Turn on camera to control the app with sign language."
+                        }
+                      </p>
+                      {modelError ? (
+                        <div className="text-[10px] text-red-400 bg-red-950/60 p-1.5 rounded-lg border border-red-500/30">
+                          {modelError}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          disabled={modelLoading}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined !text-base">play_arrow</span>
+                          <span>{modelLoading ? "Loading AI Vision..." : "Enable Sign Camera"}</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Tab 1: Live Sign Camera & Quick Actions */}
-              {activeTab === "camera" && (
-                <div className="p-4 flex flex-col gap-3">
-                  
-                  {/* Camera Video Feed */}
-                  <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center group shadow-inner">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-cover transform -scale-x-100 ${cameraActive ? "block" : "hidden"}`}
-                    />
-                    <canvas
-                      ref={canvasRef}
-                      width={640}
-                      height={480}
-                      className={`absolute inset-0 w-full h-full object-cover transform -scale-x-100 pointer-events-none ${cameraActive ? "block" : "hidden"}`}
-                    />
-
-                    {cameraActive ? (
-                      <>
-                        <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-lg bg-slate-900/85 backdrop-blur-md border border-cyan-500/40 text-[11px] text-white flex items-center gap-1.5">
-                          <span className="font-bold text-cyan-400">{detectedGesture !== "None" ? detectedGesture : "Ready"}</span>
-                          {detectedConfidence > 0 && (
-                            <span className="text-[9px] px-1 rounded bg-cyan-500/20 text-cyan-300 font-mono">
-                              {detectedConfidence}%
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={stopCamera}
-                          className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-red-600/90 hover:bg-red-600 text-white text-[10px] font-bold flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined !text-xs">videocam_off</span>
-                          <span>Stop</span>
-                        </button>
-                      </>
-                    ) : (
-                      <div className="text-center p-4 flex flex-col items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
-                          <span className="material-symbols-outlined !text-2xl">videocam</span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 max-w-xs">
-                          Turn on camera to control the app with sign language.
-                        </p>
-                        {modelError ? (
-                          <div className="text-[10px] text-red-400 bg-red-950/60 p-1.5 rounded-lg">
-                            {modelError}
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={startCamera}
-                            disabled={modelLoading}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 text-white text-xs font-bold shadow-lg shadow-cyan-500/25 flex items-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined !text-base">play_arrow</span>
-                            <span>{modelLoading ? "Loading AI..." : "Enable Sign Camera"}</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Fast Sign Command Pills */}
+                {/* ── Tab 1 Content: Quick Command Pills (Shown in Camera Mode) ── */}
+                {activeTab === "camera" && (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
                       <span>Quick Commands:</span>
@@ -1026,9 +1002,9 @@ export default function SignAvatarAssistant({
                       })}
                     </div>
                   </div>
+                )}
 
-                </div>
-              )}
+              </div>
 
               {/* Tab 2: Captions & History Chat Feed */}
               {activeTab === "chat" && (
