@@ -37,12 +37,12 @@ const SIGN_COMMANDS = [
   {
     gesture: "Thumb_Up",
     signName: "Thumbs Up",
-    actionName: "Course Library",
+    actionName: "Select / Confirm",
     icon: "👍",
-    targetTab: "courses",
-    description: "Takes you directly to the full ASL Course Library",
+    targetTab: "select",
+    description: "Selects the highlighted option or launches the active course lesson",
     avatarPose: "thumbs_up",
-    speechText: "Opening the Course Library."
+    speechText: "Selected."
   },
   {
     gesture: "Open_Palm",
@@ -69,6 +69,7 @@ const SIGN_COMMANDS = [
 export default function SignAvatarAssistant({
   onNavigate,
   onOpenSignPractice,
+  onSelect,
   isLight = false,
   className = ""
 }) {
@@ -272,12 +273,16 @@ export default function SignAvatarAssistant({
       } else if (onNavigate) {
         onNavigate("learn-signs");
       }
+    } else if (command.targetTab === "select" || command.targetTab === "confirm") {
+      if (onSelect) {
+        onSelect();
+      } else if (onNavigate) {
+        onNavigate("select");
+      }
     } else if (command.targetTab === "help") {
       setActiveTab("guide");
     } else if (command.targetTab === "back") {
       if (onNavigate) onNavigate("home");
-    } else if (command.targetTab === "confirm") {
-      if (onNavigate) onNavigate("courses");
     }
 
     setTimeout(() => {

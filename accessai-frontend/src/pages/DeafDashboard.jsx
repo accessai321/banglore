@@ -1268,6 +1268,13 @@ export default function DeafDashboard() {
           setActiveCoursePlay(null);
           navigate(tab === "home" ? "/deaf" : `/deaf/${tab}`);
         }}
+        onSelect={() => {
+          const targetCourse = courses.find(c => purchasedIds.includes(c.id)) || courses[0];
+          if (targetCourse) {
+            setActiveCoursePlay(targetCourse);
+            setCurrentLessonIdx(0);
+          }
+        }}
         onOpenSignPractice={() => {
           setActiveTab("learn-signs");
           navigate("/deaf/learn-signs");
