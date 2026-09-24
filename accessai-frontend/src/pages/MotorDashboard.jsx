@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import { useVoiceAssistant } from "../hooks/useVoice";
+import { useHeadTracking } from "../hooks/useHeadTracking";
+import HeadTrackingCursor from "../components/HeadTrackingCursor";
+import { useMotorInteractionAdapter } from "../hooks/useMotorInteractionAdapter";
 
 // ── MOCK DATA MATCHING PLATFORM ──
 const MOCK_COURSES = [
@@ -111,9 +114,9 @@ function useTTS() {
 }
 
 // ── Dwell-click Engine ──
-const DWELL_MS = 1400;
+const DWELL_MS = 5000; // 5.0 seconds auto-select
 
-function useDwell(enabled, onActivate) {
+function useDwell(enabled, onActivate, dwellDuration = DWELL_MS) {
   const timerRef = useRef(null);
   const progressRef = useRef(null);
   const [dwellEl, setDwellEl] = useState(null);
@@ -124,8 +127,9 @@ function useDwell(enabled, onActivate) {
     setDwellEl(el);
     setProgress(0);
     const start = Date.now();
+    const duration = dwellDuration || DWELL_MS;
     progressRef.current = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - start) / DWELL_MS) * 100);
+      const pct = Math.min(100, ((Date.now() - start) / duration) * 100);
       setProgress(pct);
     }, 25);
     timerRef.current = setTimeout(() => {
@@ -133,8 +137,8 @@ function useDwell(enabled, onActivate) {
       setDwellEl(null);
       setProgress(0);
       cb();
-    }, DWELL_MS);
-  }, [enabled]);
+    }, duration);
+  }, [enabled, dwellDuration]);
 
   const cancel = useCallback(() => {
     clearTimeout(timerRef.current);
@@ -166,8 +170,17 @@ function useVoiceCommands(commands, active) {
         text = text.replace(new RegExp(`\\b${f}\\b`, "g"), "").trim();
       });
 
+      // Sort patterns by length descending so longer/more specific phrases match first
+      const sortedEntries = Object.entries(commandsRef.current).sort(
+        (a, b) => b[0].length - a[0].length
+      );
+
       let matched = false;
-      for (const [pattern, handler] of Object.entries(commandsRef.current)) {
+      for (const [pattern, handler] of sortedEntries) {
+        // Prevent "lock" from erroneously matching "unlock"
+        if (pattern === "lock" && text.includes("unlock")) {
+          continue;
+        }
         if (text.includes(pattern)) {
           handler(spokenText);
           matched = true;
@@ -177,7 +190,10 @@ function useVoiceCommands(commands, active) {
       
       if (!matched) {
         const originalText = spokenText.toLowerCase().trim();
-        for (const [pattern, handler] of Object.entries(commandsRef.current)) {
+        for (const [pattern, handler] of sortedEntries) {
+          if (pattern === "lock" && originalText.includes("unlock")) {
+            continue;
+          }
           if (originalText.includes(pattern)) {
             handler(spokenText);
             break;
@@ -254,7 +270,7 @@ function DwellButton({ label, sublabel, icon, onClick, active = false, color = "
   return (
     <button
       disabled={disabled}
-      onClick={!dwellEnabled ? onClick : undefined}
+      onClick={onClick}
       onMouseEnter={handleEnter}
       onMouseLeave={dwell.cancel}
       onFocus={() => speak && speak(`${label}. ${sublabel || ""}`)}
@@ -354,7 +370,75 @@ export default function MotorDashboard() {
   const [cursorSize, setCursorSize] = useState("xl"); // normal, xl, xxl
   const [fontSize, setFontSize] = useState("large"); // medium, large, x-large
 
-  // Eye-tracking simulator calibration
+  // Head Tracking (real MediaPipe-powered)
+  const headTracking = useHeadTracking();
+  const mainScrollRef = useRef(null);
+
+  // Automatically start head tracking & virtual cursor upon entering Motor Mode
+  useEffect(() => {
+    if (!headTracking.enabled) {
+      headTracking.setEnabled(true);
+    }
+  }, []); // Run on mount
+
+  // Smooth scroll utility for both container and window
+  const scrollContentBy = useCallback((deltaY, smooth = true) => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollBy({
+        top: deltaY,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollBy({
+        top: deltaY,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
+  }, []);
+
+  // Cursor-based auto scroll: when virtual cursor moves near bottom or top edges, scroll smoothly
+  useEffect(() => {
+    if (!headTracking.enabled || headTracking.locked || !headTracking.cursorPos) return;
+
+    let animId = null;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    const y = headTracking.cursorPos.y;
+    const x = headTracking.cursorPos.x;
+
+    // Only scroll within the main content area (right of sidebar)
+    const isInContentColumn = x > 280;
+    const bottomThreshold = vh - 90;
+    const topThreshold = 80;
+
+    let scrollDelta = 0;
+    if (isInContentColumn && y >= bottomThreshold) {
+      const intensity = Math.min(1, (y - bottomThreshold) / 60);
+      scrollDelta = Math.round(5 + intensity * 15); // 5px to 20px per frame down
+    } else if (isInContentColumn && y <= topThreshold) {
+      const intensity = Math.min(1, (topThreshold - y) / 60);
+      scrollDelta = -Math.round(5 + intensity * 15); // 5px to 20px per frame up
+    }
+
+    if (scrollDelta !== 0) {
+      const step = () => {
+        if (mainScrollRef.current) {
+          mainScrollRef.current.scrollTop += scrollDelta;
+        }
+        if (typeof window !== "undefined") {
+          window.scrollBy(0, scrollDelta);
+        }
+        animId = requestAnimationFrame(step);
+      };
+      animId = requestAnimationFrame(step);
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [headTracking.cursorPos, headTracking.enabled, headTracking.locked]);
+
+  // Eye-tracking simulator calibration (legacy sim, kept for compat)
   const [eyeTrackingState, setEyeTrackingState] = useState("calibrated"); // disabled, calibrating, calibrated
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [cursorSimPos, setCursorSimPos] = useState({ x: 100, y: 100 });
@@ -363,10 +447,50 @@ export default function MotorDashboard() {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef(null);
   const announcedRef = useRef(false);
+  const [dwellMs, setDwellMs] = useState(5000); // 5.0 seconds auto-select
 
   // Hooks setup
-  const dwell = useDwell(dwellEnabled, () => {});
+  const dwell = useDwell(dwellEnabled, () => {}, dwellMs);
   useSwitchScan(switchEnabled, containerRef, focusedIndex, setFocusedIndex);
+
+  // Motor interaction adapter bridges virtual cursor to existing dwell engine without duplicate engines
+  const motorAdapter = useMotorInteractionAdapter({
+    cursorPos: headTracking.cursorPos,
+    enabled: headTracking.enabled && dwellEnabled,
+    dwellEngine: dwell,
+    dwellDuration: dwellMs,
+    containerRef,
+  });
+
+  // Cursor lock/unlock keyboard shortcuts (Space or 'L')
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+      if (e.code === "Space" || e.key === "l" || e.key === "L") {
+        if (headTracking.enabled) {
+          e.preventDefault();
+          const nextLocked = headTracking.toggleCursorLock();
+          speak(nextLocked ? "Cursor movement locked." : "Cursor movement unlocked.");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [headTracking, speak]);
+
+  // Handle accessible audio announcements when cursor is unlocked by head or eye gesture
+  useEffect(() => {
+    if (!headTracking.tracker) return;
+    headTracking.tracker.onGestureUnlock = (reason) => {
+      const gestureName = reason === "gesture_eye" ? "eye gesture" : "head gesture";
+      speak(`Cursor unlocked by ${gestureName}.`);
+    };
+    return () => {
+      if (headTracking.tracker) {
+        headTracking.tracker.onGestureUnlock = null;
+      }
+    };
+  }, [headTracking.tracker, speak]);
 
   // Load backend data if not in demo mode
   useEffect(() => {
@@ -502,8 +626,117 @@ export default function MotorDashboard() {
     "turn off dwell": () => { setDwellEnabled(false); speak("Dwell click timers deactivated."); },
     "turn on switch": () => { setSwitchEnabled(true); speak("Switch navigation activated."); },
     "turn off switch": () => { setSwitchEnabled(false); speak("Switch navigation deactivated."); },
-    "sign out": () => { speak("Logging you out. Redirecting to landing page."); setTimeout(logout, 1200); },
-    "help": () => speak("Shortcuts: home, courses, learning, tutor, settings, turn on dwell, turn off switch, sign out.")
+    // ── Head tracking voice commands ──
+    "turn on head tracking": () => {
+      headTracking.setEnabled(true);
+      speak("Head tracking activated. Move your head to control the cursor. Open your mouth to click.");
+    },
+    "enable head tracking": () => {
+      headTracking.setEnabled(true);
+      speak("Head tracking enabled.");
+    },
+    "turn off head tracking": () => {
+      headTracking.setEnabled(false);
+      speak("Head tracking deactivated.");
+    },
+    "disable head tracking": () => {
+      headTracking.setEnabled(false);
+      speak("Head tracking disabled.");
+    },
+    "recalibrate": () => {
+      headTracking.recalibrate();
+      speak("Head tracking recalibrated. Keep your head in a neutral position.");
+    },
+    "lock": () => {
+      headTracking.lockCursor();
+      speak("Cursor movement locked.");
+    },
+    "lock cursor": () => {
+      headTracking.lockCursor();
+      speak("Cursor movement locked.");
+    },
+    "lock pointer": () => {
+      headTracking.lockCursor();
+      speak("Cursor movement locked.");
+    },
+    "freeze cursor": () => {
+      headTracking.lockCursor();
+      speak("Cursor movement locked.");
+    },
+    "unlock": () => {
+      headTracking.unlockCursor("voice");
+      speak("Cursor movement unlocked.");
+    },
+    "unlock cursor": () => {
+      headTracking.unlockCursor("voice");
+      speak("Cursor movement unlocked.");
+    },
+    "unlock pointer": () => {
+      headTracking.unlockCursor("voice");
+      speak("Cursor movement unlocked.");
+    },
+    "unfreeze cursor": () => {
+      headTracking.unlockCursor("voice");
+      speak("Cursor movement unlocked.");
+    },
+    "toggle cursor lock": () => {
+      const isLocked = headTracking.toggleCursorLock();
+      speak(isLocked ? "Cursor locked." : "Cursor unlocked.");
+    },
+    "scroll down": () => {
+      scrollContentBy(380, true);
+      speak("Scrolling down.");
+    },
+    "scroll up": () => {
+      scrollContentBy(-380, true);
+      speak("Scrolling up.");
+    },
+    "scroll to bottom": () => {
+      scrollContentBy(2500, true);
+      speak("Scrolling to bottom.");
+    },
+    "scroll bottom": () => {
+      scrollContentBy(2500, true);
+      speak("Scrolling to bottom.");
+    },
+    "scroll to top": () => {
+      scrollContentBy(-2500, true);
+      speak("Scrolling to top.");
+    },
+    "scroll top": () => {
+      scrollContentBy(-2500, true);
+      speak("Scrolling to top.");
+    },
+    "page down": () => {
+      scrollContentBy(500, true);
+      speak("Page down.");
+    },
+    "page up": () => {
+      scrollContentBy(-500, true);
+      speak("Page up.");
+    },
+    "switch mode": () => {
+      speak("Opening mode selection.");
+      navigate("/");
+    },
+    "change mode": () => {
+      speak("Opening mode selection.");
+      navigate("/");
+    },
+    "modes": () => {
+      speak("Opening mode selection.");
+      navigate("/");
+    },
+    "three modes": () => {
+      speak("Opening mode selection.");
+      navigate("/");
+    },
+    "sign out": () => {
+      speak("Logging you out. Returning to mode selection.");
+      logout();
+      navigate("/");
+    },
+    "help": () => speak("Shortcuts: home, courses, learning, tutor, settings, scroll down, scroll up, switch mode, turn on head tracking, recalibrate, lock, unlock, turn on dwell, sign out.")
   }, voiceActive && !speaking);
 
   // Initial Greeting & Idle Prompt Logic
@@ -537,8 +770,20 @@ export default function MotorDashboard() {
       <div className="absolute top-10 left-10 w-[450px] h-[450px] bg-indigo-500/5 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-20 right-20 w-[450px] h-[450px] bg-cyan-500/5 rounded-full blur-[140px] pointer-events-none" />
 
-      {/* Simulated Eye-Tracking Cursor follow dot */}
-      {eyeTrackingState === "calibrated" && cursorSize !== "normal" && (
+      {/* ── Head Tracking Cursor Overlay ── */}
+      <HeadTrackingCursor
+        cursorPos={headTracking.cursorPos}
+        dwellProgress={dwell.dwellEl ? dwell.progress : motorAdapter.dwellProgress}
+        dwellTarget={dwell.dwellEl || motorAdapter.currentTarget}
+        currentTarget={motorAdapter.currentTarget}
+        status={headTracking.status}
+        errorMsg={headTracking.errorMsg}
+        locked={headTracking.locked}
+        onToggleLock={headTracking.toggleCursorLock}
+      />
+
+      {/* Simulated Eye-Tracking Cursor follow dot (legacy sim) */}
+      {!headTracking.enabled && eyeTrackingState === "calibrated" && cursorSize !== "normal" && (
         <div 
           className={`fixed pointer-events-none rounded-full bg-cyan-400/25 border border-cyan-400/80 z-[9999] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center transition-transform duration-100 ${
             cursorSize === "xxl" ? "w-16 h-16" : "w-10 h-10"
@@ -554,13 +799,14 @@ export default function MotorDashboard() {
         <div className="p-6 flex flex-col gap-8">
           {/* Logo & Mode pill */}
           <div 
-            onClick={() => navigate("/motor")}
-            className="flex flex-col gap-2 cursor-pointer"
+            onClick={() => navigate("/")}
+            title="Return to AccessAI 3 Modes selection"
+            className="flex flex-col gap-2 cursor-pointer group"
           >
-            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">AccessAI</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent group-hover:opacity-90 transition-opacity">AccessAI</span>
             <span className="self-start text-[10px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-700 border border-cyan-500/25 px-3 py-1 rounded-full flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              Motor Mode
+              Motor Mode • Click to change
             </span>
           </div>
 
@@ -591,8 +837,8 @@ export default function MotorDashboard() {
           </nav>
         </div>
 
-        {/* Footer profile & logout */}
-        <div className={`p-6 border-t ${borderClass} flex flex-col gap-4`}>
+        {/* Footer profile & actions */}
+        <div className={`p-6 border-t ${borderClass} flex flex-col gap-3`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">
               AH
@@ -603,6 +849,19 @@ export default function MotorDashboard() {
             </div>
           </div>
           <DwellButton
+            label="Switch Mode"
+            sublabel='say "switch mode"'
+            icon="swap_horiz"
+            color="indigo"
+            dwellEnabled={dwellEnabled}
+            dwell={dwell}
+            speak={speak}
+            onClick={() => {
+              speak("Opening mode selection to choose from all 3 modes.");
+              navigate("/");
+            }}
+          />
+          <DwellButton
             label="Sign Out"
             sublabel='say "sign out"'
             icon="logout"
@@ -610,31 +869,80 @@ export default function MotorDashboard() {
             dwellEnabled={dwellEnabled}
             dwell={dwell}
             speak={speak}
-            onClick={logout}
+            onClick={() => {
+              speak("Signing you out.");
+              logout();
+              navigate("/");
+            }}
           />
         </div>
       </aside>
 
       {/* ── MAIN CONTENT AREA ── */}
-      <main className="flex-1 min-h-screen overflow-y-auto p-8 relative z-10 flex flex-col gap-6">
+      <main ref={mainScrollRef} className="flex-1 min-h-screen overflow-y-auto p-8 relative z-10 flex flex-col gap-6">
         
         {/* Top Navbar Status indicators */}
         <div className={`flex justify-between items-center ${cardClass} p-4 rounded-2xl`}>
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-4 items-center flex-wrap">
             {voiceActive && listening && (
               <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 Mic Listening
               </div>
             )}
-            {eyeTrackingState === "calibrated" ? (
+            {/* Head Tracking status badge */}
+            {(headTracking.status === "ready" || headTracking.status === "active") && (
+              <div className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-700 px-3 py-1.5 rounded-xl text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                Head Tracking Active
+              </div>
+            )}
+            {/* Cursor & Voice scroll badge */}
+            <div className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-700 px-3 py-1.5 rounded-xl text-xs font-bold">
+              <span className="material-symbols-outlined text-sm">unfold_more</span>
+              <span>Scroll: Move Cursor to Edge or say "Scroll Down"</span>
+            </div>
+            {/* Lock / Unlock Cursor Movement Toggle */}
+            {(headTracking.status === "ready" || headTracking.status === "active") && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = headTracking.toggleCursorLock();
+                  speak(next ? "Cursor movement locked." : "Cursor movement unlocked.");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  headTracking.locked
+                    ? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-sm shadow-amber-500/20"
+                    : "bg-slate-800/80 border-white/10 text-slate-300 hover:border-violet-500/40 hover:text-white"
+                }`}
+                title="Lock or unlock cursor position (Shortcut: Space or L)"
+              >
+                <span>{headTracking.locked ? "🔒" : "🔓"}</span>
+                <span>{headTracking.locked ? "Cursor: LOCKED (Space to Unlock)" : "Lock Cursor"}</span>
+              </button>
+            )}
+            {/* Dwell Selection duration badge */}
+            {dwellEnabled && (
+              <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                <span className="material-symbols-outlined text-sm">timer</span>
+                Auto-Select: 5.0s Dwell
+              </div>
+            )}
+            {(headTracking.status === "loading" || headTracking.status === "initializing") && (
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-700 px-3 py-1.5 rounded-xl text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-spin" style={{borderTop:'2px solid transparent',borderRadius:'50%'}} />
+                Head Tracking Loading…
+              </div>
+            )}
+            {(headTracking.status === "no-camera" || headTracking.status === "permission-denied" || headTracking.status === "unavailable") && (
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-600 px-3 py-1.5 rounded-xl text-xs font-bold">
+                Camera Access Denied / Unavailable
+              </div>
+            )}
+            {!headTracking.enabled && eyeTrackingState === "calibrated" && (
               <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 px-3 py-1.5 rounded-xl text-xs font-bold">
                 <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                Eye Tracker Calibrated
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 px-3 py-1.5 rounded-xl text-xs font-bold">
-                Eye Tracker Disconnected
+                Gaze Sim Active
               </div>
             )}
           </div>
@@ -1410,22 +1718,229 @@ export default function MotorDashboard() {
           <div className="flex flex-col gap-8 animate-fadeIn max-w-3xl mx-auto w-full">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Accessibility Configurations</h1>
-              <p className="text-xs text-slate-400 font-medium">Calibrate dwell mouse clicks, cycling scan speeds, and visual pointers.</p>
+              <p className="text-xs text-slate-400 font-medium">Calibrate dwell mouse clicks, head tracking, cycling scan speeds, and visual pointers.</p>
             </div>
 
             <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-8 flex flex-col gap-6">
+
+              {/* ── HEAD TRACKING SECTION ─────────────────────────────────── */}
+              <div className="pb-6 border-b border-white/5 flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-violet-400">face_retouching_natural</span>
+                  <h3 className="text-sm font-bold text-slate-200">Head Tracking Control</h3>
+                  <span className="ml-auto text-[9px] uppercase font-bold px-2 py-0.5 bg-violet-500/15 text-violet-400 border border-violet-500/25 rounded-full">
+                    MediaPipe AI
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Uses your webcam to track head movement. Move your head to control the cursor.
+                  <span className="text-violet-400 font-semibold"> Open your mouth</span> to click, or hold still to dwell-select.
+                  <span className="text-cyan-400 font-semibold"> Tilt head left/right</span> to scroll.
+                </p>
+
+                {/* Enable/Disable toggle */}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Enable head tracking</span>
+                  <button
+                    onClick={() => {
+                      headTracking.setEnabled(v => !v);
+                      if (!headTracking.enabled) {
+                        speak("Head tracking activated. Move your head to control the cursor. Open your mouth to click.");
+                      } else {
+                        speak("Head tracking deactivated.");
+                      }
+                    }}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                      headTracking.enabled
+                        ? "bg-violet-600 border-violet-500 text-white"
+                        : "bg-slate-900 border-white/5 text-slate-400 hover:border-violet-500/40"
+                    }`}
+                  >
+                    {(headTracking.status === "loading" || headTracking.status === "initializing")
+                      ? "Initialising…"
+                      : headTracking.enabled
+                      ? "Head Tracking: ON"
+                      : "Head Tracking: OFF"}
+                  </button>
+                </div>
+
+                {/* Status indicator */}
+                {headTracking.enabled && (
+                  <div className={`flex items-center gap-3 p-3 rounded-xl text-xs font-semibold ${
+                    headTracking.status === "ready" || headTracking.status === "active"
+                      ? "bg-violet-500/10 border border-violet-500/20 text-violet-300"
+                      : headTracking.status === "loading" || headTracking.status === "initializing"
+                      ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                      : "bg-red-500/10 border border-red-500/20 text-red-400"
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      headTracking.status === "ready" || headTracking.status === "active"
+                        ? "bg-violet-400 animate-pulse"
+                        : headTracking.status === "loading" || headTracking.status === "initializing"
+                        ? "bg-amber-400 animate-spin"
+                        : "bg-red-400"
+                    }`} />
+                    {headTracking.status === "ready" || headTracking.status === "active"
+                      ? "Camera active · Head tracking running · Look forward and keep head neutral."
+                      : headTracking.status === "loading" || headTracking.status === "initializing"
+                      ? "Loading AI face model… this may take 5-10 seconds on first run."
+                      : headTracking.errorMsg || "Could not start head tracking."}
+                  </div>
+                )}
+
+                {/* Calibration controls */}
+                {(headTracking.status === "ready" || headTracking.status === "active") && (
+                  <div className="flex flex-col gap-3">
+                    {/* Quick recalibrate */}
+                    <DwellButton
+                      label="Quick Recalibrate"
+                      sublabel="Look straight ahead, then click"
+                      icon="my_location"
+                      color="indigo"
+                      dwellEnabled={dwellEnabled}
+                      dwell={dwell}
+                      speak={speak}
+                      onClick={() => {
+                        headTracking.recalibrate();
+                        speak("Recalibrated. Keep head in neutral position.");
+                      }}
+                    />
+                    {/* Full 5-step calibration */}
+                    {!headTracking.calibrationStep ? (
+                      <DwellButton
+                        label="Full 5-Point Calibration"
+                        sublabel="For best accuracy — takes ~15 seconds"
+                        icon="tune"
+                        color="cyan"
+                        dwellEnabled={dwellEnabled}
+                        dwell={dwell}
+                        speak={speak}
+                        onClick={() => {
+                          headTracking.startCalibration();
+                          speak("Starting calibration. Look straight at the screen and hold still.");
+                        }}
+                      />
+                    ) : headTracking.calibrationStep !== "complete" ? (
+                      <div className="bg-indigo-500/10 border border-indigo-500/25 rounded-xl p-4 flex flex-col gap-3">
+                        <p className="text-xs font-bold text-indigo-300">
+                          Calibrating — Step: {headTracking.calibrationStep?.toUpperCase()}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {headTracking.calibrationStep === "center" && "Look straight ahead at the screen."}
+                          {headTracking.calibrationStep === "left" && "Turn your head to the LEFT as far as comfortable."}
+                          {headTracking.calibrationStep === "right" && "Turn your head to the RIGHT as far as comfortable."}
+                          {headTracking.calibrationStep === "up" && "Look UP as far as comfortable."}
+                          {headTracking.calibrationStep === "down" && "Look DOWN as far as comfortable."}
+                          {headTracking.calibrationStep === "confirm" && "Calibration complete!"}
+                        </p>
+                        <DwellButton
+                          label={`Record: ${headTracking.calibrationStep?.toUpperCase()}`}
+                          icon="check_circle"
+                          color="green"
+                          dwellEnabled={dwellEnabled}
+                          dwell={dwell}
+                          speak={speak}
+                          onClick={() => {
+                            headTracking.recordCalibrationStep();
+                            speak(`Recorded ${headTracking.calibrationStep}. ${headTracking.calibrationStep === "down" ? "Calibration complete!" : "Next step."}`);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="bg-green-500/10 border border-green-500/25 rounded-xl p-3 text-xs font-bold text-green-400">
+                        ✓ Calibration saved! Head tracking is now optimized for your range of motion.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-settings when enabled */}
+                {headTracking.enabled && (
+                  <div className="flex flex-col gap-4 pt-2">
+                    {/* Sensitivity slider */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Cursor sensitivity</span>
+                        <span className="text-violet-400 font-bold">{headTracking.sensitivity} / 5</span>
+                      </div>
+                      <input
+                        type="range" min="1" max="5" step="1"
+                        value={headTracking.sensitivity}
+                        onChange={e => headTracking.setSensitivity(Number(e.target.value))}
+                        className="w-full accent-violet-500 h-2 rounded-full cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-600">
+                        <span>Slow</span>
+                        <span>Fast</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* ── END HEAD TRACKING ──────────────────────────────────────── */}
+
               {/* Dwell config */}
               <div className="pb-6 border-b border-white/5 flex flex-col gap-3">
-                <h3 className="text-sm font-bold text-slate-200">Dwell Selection Engine</h3>
-                <div className="flex justify-between items-center text-xs mt-2">
-                  <span className="text-slate-400">Enable gaze hover timers</span>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-slate-200">Dwell Selection Engine</h3>
                   <button 
                     onClick={() => setDwellEnabled(d => !d)}
                     className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
-                      dwellEnabled ? "bg-cyan-600 border-cyan-500 text-white" : "bg-slate-900 border-white/5 text-slate-400"
+                      dwellEnabled ? "bg-indigo-600 border-indigo-500 text-white" : "bg-slate-900 border-white/5 text-slate-400"
                     }`}
                   >
-                    {dwellEnabled ? "Gaze Timer Active" : "Gaze Timer Disabled"}
+                    {dwellEnabled ? "Dwell Auto-Select: ON" : "Dwell Auto-Select: OFF"}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Hold your cursor over any menu option or button to automatically select it.
+                </p>
+
+                {/* Dwell duration selector */}
+                <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-white/5">
+                  <span className="text-slate-400">Auto-Select Duration</span>
+                  <div className="flex gap-2">
+                    {[
+                      { ms: 1400, label: "1.4s" },
+                      { ms: 3000, label: "3.0s" },
+                      { ms: 5000, label: "5.0s (Default)" },
+                    ].map(opt => (
+                      <button
+                        key={opt.ms}
+                        onClick={() => {
+                          setDwellMs(opt.ms);
+                          speak(`Auto-select dwell duration set to ${opt.ms / 1000} seconds.`);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          dwellMs === opt.ms
+                            ? "bg-indigo-600 border border-indigo-400 text-white shadow-sm"
+                            : "bg-slate-900 border border-white/10 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cursor Movement Lock in Settings */}
+                <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-white/5">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-200 font-semibold">Cursor Movement Lock</span>
+                    <span className="text-[11px] text-slate-500">Shortcut: Press Space or 'L' key</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const next = headTracking.toggleCursorLock();
+                      speak(next ? "Cursor movement locked." : "Cursor movement unlocked.");
+                    }}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      headTracking.locked
+                        ? "bg-amber-500/25 border-amber-500/50 text-amber-300"
+                        : "bg-slate-900 border-white/10 text-slate-300 hover:border-violet-500/40"
+                    }`}
+                  >
+                    {headTracking.locked ? "🔒 Cursor: LOCKED" : "🔓 Lock Cursor"}
                   </button>
                 </div>
               </div>
@@ -1491,6 +2006,47 @@ export default function MotorDashboard() {
           </div>
         )}
       </main>
+
+      {/* Floating Hands-Free Scroll Controls */}
+      {headTracking.enabled && (
+        <div 
+          className="fixed bottom-6 right-56 z-[99992] flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-cyan-500/30 shadow-2xl"
+          role="region"
+          aria-label="Cursor & Voice Scroll Controls"
+        >
+          <span className="text-[11px] font-bold text-slate-400 hidden xl:inline">
+            Scroll:
+          </span>
+          <button
+            type="button"
+            data-switchable
+            onClick={() => scrollContentBy(-380, true)}
+            onMouseEnter={() => {
+              dwell.startDwell("btn_scroll_up", () => scrollContentBy(-380, true));
+            }}
+            onMouseLeave={dwell.cancelDwell}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold transition-all border border-cyan-500/20 active:scale-95 cursor-pointer shadow-sm"
+            title="Scroll up (hover to dwell, move cursor to top edge, or say 'scroll up')"
+          >
+            <span className="material-symbols-outlined text-sm">arrow_upward</span>
+            <span>Up</span>
+          </button>
+          <button
+            type="button"
+            data-switchable
+            onClick={() => scrollContentBy(380, true)}
+            onMouseEnter={() => {
+              dwell.startDwell("btn_scroll_down", () => scrollContentBy(380, true));
+            }}
+            onMouseLeave={dwell.cancelDwell}
+            className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-md"
+            title="Scroll down (hover to dwell, move cursor to bottom edge, or say 'scroll down')"
+          >
+            <span className="material-symbols-outlined text-sm">arrow_downward</span>
+            <span>Down</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

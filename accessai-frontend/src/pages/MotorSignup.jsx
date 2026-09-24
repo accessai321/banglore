@@ -6,6 +6,9 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import VoiceEmailInput from "../components/VoiceEmailInput";
 import { useVoiceAssistant } from "../hooks/useVoice";
+import { useHeadTracking } from "../hooks/useHeadTracking";
+import HeadTrackingCursor from "../components/HeadTrackingCursor";
+import { useMotorInteractionAdapter } from "../hooks/useMotorInteractionAdapter";
 
 const DWELL_MS = 1400;
 
@@ -222,6 +225,16 @@ export default function MotorSignup() {
     setVoiceActive,
     setSpellingMode
   } = useVoiceAssistant();
+
+  // Head Tracking
+  const headTracking = useHeadTracking();
+
+  // Automatically start head tracking & virtual cursor upon entering Motor Signup
+  useEffect(() => {
+    if (!headTracking.enabled) {
+      headTracking.setEnabled(true);
+    }
+  }, []);
 
   const [motorStep, setMotorStep] = useState(MOTOR_STEP_SIGNUP_NONE);
   const [showVoiceEmail, setShowVoiceEmail] = useState(false);
@@ -524,6 +537,19 @@ export default function MotorSignup() {
     setDwellEl(null);
     setDwellProgress(0);
   };
+
+  // MotorInteractionAdapter bridge to existing dwell without duplicate engine
+  useMotorInteractionAdapter({
+    cursorPos: headTracking.cursorPos,
+    enabled: headTracking.enabled,
+    dwellEngine: {
+      start: startDwell,
+      cancel: cancelDwell,
+      dwellEl,
+      progress: dwellProgress,
+    },
+    dwellDuration: DWELL_MS,
+  });
 
   // Switch Scanning effects
   useEffect(() => {
@@ -1181,9 +1207,19 @@ export default function MotorSignup() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans relative overflow-hidden flex flex-col items-center justify-center p-4 pt-20 pb-12">
+
+      {/* Head Tracking Cursor Overlay */}
+      <HeadTrackingCursor
+        cursorPos={headTracking.cursorPos}
+        dwellProgress={dwellProgress}
+        dwellTarget={dwellEl}
+        status={headTracking.status}
+      />
+
       {/* Soft gradient glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-tr from-primary/10 to-secondary/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10 blur-[120px] pointer-events-none" />
+
 
       {/* Header */}
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm">

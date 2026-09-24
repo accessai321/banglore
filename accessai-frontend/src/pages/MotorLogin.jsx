@@ -6,6 +6,9 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import VoiceEmailInput from "../components/VoiceEmailInput";
 import { useVoiceAssistant } from "../hooks/useVoice";
+import { useHeadTracking } from "../hooks/useHeadTracking";
+import HeadTrackingCursor from "../components/HeadTrackingCursor";
+import { useMotorInteractionAdapter } from "../hooks/useMotorInteractionAdapter";
 
 const DWELL_MS = 1400;
 
@@ -33,6 +36,16 @@ export default function MotorLogin() {
     voiceActive,
     setVoiceActive
   } = useVoiceAssistant();
+
+  // Head Tracking
+  const headTracking = useHeadTracking();
+
+  // Automatically start head tracking & virtual cursor upon entering Motor Login
+  useEffect(() => {
+    if (!headTracking.enabled) {
+      headTracking.setEnabled(true);
+    }
+  }, []);
 
   const [motorStep, setMotorStep] = useState(MOTOR_STEP_NONE);
   const [showVoiceEmail, setShowVoiceEmail] = useState(false);
@@ -85,6 +98,19 @@ export default function MotorLogin() {
     setDwellEl(null);
     setDwellProgress(0);
   };
+
+  // MotorInteractionAdapter bridge to existing dwell without duplicate engine
+  useMotorInteractionAdapter({
+    cursorPos: headTracking.cursorPos,
+    enabled: headTracking.enabled,
+    dwellEngine: {
+      start: startDwell,
+      cancel: cancelDwell,
+      dwellEl,
+      progress: dwellProgress,
+    },
+    dwellDuration: DWELL_MS,
+  });
 
   // Voice Helper functions
   const playBeep = () => {
@@ -324,6 +350,14 @@ export default function MotorLogin() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans relative overflow-hidden flex flex-col items-center justify-center p-4">
+
+      {/* Head Tracking Cursor Overlay */}
+      <HeadTrackingCursor
+        cursorPos={headTracking.cursorPos}
+        dwellProgress={dwellProgress}
+        dwellTarget={dwellEl}
+        status={headTracking.status}
+      />
       {/* Soft gradient glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-tr from-primary/10 to-secondary/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10 blur-[120px] pointer-events-none" />
@@ -418,6 +452,57 @@ export default function MotorLogin() {
           </span>
           <span>{voiceActive || showVoiceEmail ? "Voice Mode: ACTIVE" : "Activate Voice Mode"}</span>
         </button>
+
+        {/* Head Tracking Toggle */}
+        <button
+          data-switchable
+          onClick={() => headTracking.setEnabled(v => !v)}
+          onMouseEnter={() => startDwell("btn_head_tracking", () => headTracking.setEnabled(v => !v))}
+          onMouseLeave={cancelDwell}
+          className={`w-full py-3.5 border-2 rounded-xl flex items-center justify-center gap-2 font-bold transition-all relative overflow-hidden cursor-pointer ${
+            headTracking.enabled
+              ? "bg-violet-50 border-violet-500 text-violet-700"
+              : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+          }`}
+        >
+          {isDwellActive("btn_head_tracking") && (
+            <div className="absolute inset-0 bg-violet-500/10 transition-all duration-100" style={{ width: `${dwellProgress}%` }} />
+          )}
+          <span className="material-symbols-outlined text-base">face_retouching_natural</span>
+          <span>
+            {headTracking.status === "loading" || headTracking.status === "initializing"
+              ? "Initialising Head Tracking…"
+              : headTracking.enabled
+              ? "Head Tracking: ACTIVE"
+              : "Activate Head Tracking"}
+          </span>
+          {(headTracking.status === "loading" || headTracking.status === "initializing") && (
+            <svg width="14" height="14" viewBox="0 0 14 14" className="animate-spin flex-shrink-0">
+              <circle cx="7" cy="7" r="5" fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="18 10" />
+            </svg>
+          )}
+        </button>
+
+        {/* Head tracking status line */}
+        {headTracking.enabled && (headTracking.status === "ready" || headTracking.status === "active") && (
+          <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 text-violet-700 rounded-xl px-4 py-2.5 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse flex-shrink-0" />
+            Camera active · Move your head to control cursor
+            <button
+              onClick={() => headTracking.recalibrate()}
+              className="ml-auto text-[10px] px-2 py-0.5 rounded bg-violet-100 border border-violet-300 text-violet-700 font-bold hover:bg-violet-200 cursor-pointer"
+            >
+              Recalibrate
+            </button>
+          </div>
+        )}
+        {(headTracking.status === "no-camera" || headTracking.status === "permission-denied" || headTracking.status === "unavailable") && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-2.5 text-xs font-semibold">
+            <span className="material-symbols-outlined text-sm">videocam_off</span>
+            Camera access denied or unavailable. You can still use Dwell or Switch scanning.
+          </div>
+        )}
+
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">

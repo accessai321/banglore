@@ -1,8 +1,20 @@
 import { render, screen } from '@testing-library/react';
-import App from './App';
+import App, { getPersistedRoute, saveCurrentRoute } from './App';
 
-test('renders learn react link', () => {
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+test('renders AccessAI app', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  const titleElement = screen.getByText(/Welcome to AccessAI/i);
+  expect(titleElement).toBeInTheDocument();
+});
+
+test('persists and restores the last route', () => {
+  saveCurrentRoute('/blind');
+  expect(getPersistedRoute()).toBe('/blind');
+
+  saveCurrentRoute('/motor/settings');
+  expect(getPersistedRoute()).toBe('/motor/settings');
 });

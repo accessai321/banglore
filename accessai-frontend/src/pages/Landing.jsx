@@ -89,7 +89,7 @@ export default function Landing() {
   const [selected, setSelected] = useState(null);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const navigate = useNavigate();
-  const { loginDemoUser, DEMO_MODE } = useAuth();
+  const { loginDemoUser, DEMO_MODE, user, disabilityType, logout } = useAuth();
 
   const {
     registerContext,
@@ -545,15 +545,44 @@ export default function Landing() {
     <div className="min-h-screen bg-background text-on-surface font-sans selection:bg-primary-container selection:text-white">
       {/* ── Header ── */}
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
           <span className="text-2xl font-bold text-primary font-headline">AccessAI</span>
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 hidden sm:inline-block">
+            3 Adaptive Modes
+          </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {user && disabilityType ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-on-surface-variant hidden md:inline">
+                {user.displayName || user.email}
+              </span>
+              <button
+                onClick={() => navigate(`/${disabilityType}`)}
+                className="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={logout}
+                className="px-3 py-1.5 rounded-xl border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-high text-xs font-semibold active:scale-95 transition-all"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                const el = document.getElementById("modes-grid");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm"
+            >
+              Select Mode
+            </button>
+          )}
           <button className="p-2 rounded-full hover:bg-surface-container-high transition-colors active:scale-90 duration-200" aria-label="Accessibility Settings">
             <span className="material-symbols-outlined text-on-surface-variant">settings_accessibility</span>
-          </button>
-          <button className="p-2 rounded-full hover:bg-surface-container-high transition-colors active:scale-90 duration-200" aria-label="Profile">
-            <span className="material-symbols-outlined text-on-surface-variant">account_circle</span>
           </button>
         </div>
       </header>
@@ -561,7 +590,7 @@ export default function Landing() {
       {/* ── Hero ── */}
       <main className="pt-24 pb-32 px-margin-mobile md:px-margin-desktop">
         <section className="max-w-6xl mx-auto flex flex-col items-center">
-          <div className="text-center mb-12 mt-8">
+          <div className="text-center mb-8 mt-6">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 text-on-surface font-headline leading-tight tracking-tight">
               Welcome to AccessAI
             </h1>
@@ -570,21 +599,67 @@ export default function Landing() {
             </p>
           </div>
 
+          {/* Active Session Status Notice */}
+          {user && disabilityType && (
+            <div className="w-full max-w-2xl mb-8 p-4 rounded-2xl bg-primary-fixed/30 border border-primary/35 flex flex-wrap items-center justify-between gap-4 shadow-sm animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  verified_user
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-on-surface">
+                    Signed in as {user.displayName || user.email}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Current Mode: <strong className="text-primary font-bold">{modes.find((m) => m.key === disabilityType)?.title || disabilityType}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/${disabilityType}`)}
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                >
+                  Continue to Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="px-3 py-2 rounded-xl border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-high text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── Grid Cards ── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter w-full mb-12">
+          <div id="modes-grid" className="grid grid-cols-1 md:grid-cols-3 gap-gutter w-full mb-12">
             {modes.map((mode) => {
               const isSelected = selected === mode.key;
+              const isCurrentActive = disabilityType === mode.key;
               return (
                 <button
                   key={mode.key}
                   onClick={() => selectMode(mode.key, true)}
-                  className={`glass-card p-8 rounded-2xl text-left flex flex-col gap-6 group focus-visible w-full ${isSelected
+                  className={`glass-card p-8 rounded-2xl text-left flex flex-col gap-6 group focus-visible w-full cursor-pointer relative ${
+                    isSelected
                       ? `-translate-y-2 border-2 ${mode.borderActive} ring-4 ${mode.ringColor} shadow-lg`
                       : "border border-outline-variant/30 hover:-translate-y-2 shadow-sm"
-                    }`}
+                  }`}
                   aria-pressed={isSelected}
                   aria-label={`Select ${mode.title}`}
                 >
+                  {isCurrentActive && (
+                    <div className="absolute top-4 right-4">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Active
+                      </span>
+                    </div>
+                  )}
+
                   <div className={`w-16 h-16 rounded-2xl ${mode.bgFixed} flex items-center justify-center ${mode.textAccent} ${mode.groupHoverBg} group-hover:text-white transition-all`}>
                     <span className="material-symbols-outlined !text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>
                       {mode.icon}
@@ -597,7 +672,7 @@ export default function Landing() {
                   </div>
 
                   <div className={`mt-auto flex items-center ${mode.textAccent} font-bold text-sm`}>
-                    <span>Select Mode</span>
+                    <span>{isSelected ? "Selected" : isCurrentActive ? "Switch to this mode" : "Select Mode"}</span>
                     <span className="material-symbols-outlined ml-2 text-sm">arrow_forward</span>
                   </div>
                 </button>
