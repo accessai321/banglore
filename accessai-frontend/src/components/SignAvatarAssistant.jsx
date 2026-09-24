@@ -239,17 +239,39 @@ export default function SignAvatarAssistant({
     }, 1500);
   }, [onNavigate, onOpenSignPractice, triggerAvatarResponse]);
 
+  // Ensure video element receives stream and starts playing as soon as camera is active
+  useEffect(() => {
+    if (cameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().then(() => {
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        requestRef.current = requestAnimationFrame(predictLoop);
+      }).catch((err) => {
+        console.warn("Video playback exception:", err);
+      });
+    }
+  }, [cameraActive]);
+
   // Start Webcam
   const startCamera = async () => {
     try {
       setModelError(null);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: "user" }
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        },
+        audio: false
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.addEventListener("loadeddata", predictLoop);
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.log("Play on start:", e);
+        }
       }
       setCameraActive(true);
       setAvatarMood("listening");
@@ -257,7 +279,7 @@ export default function SignAvatarAssistant({
       triggerAvatarResponse("👀 Camera active! Watching for your sign commands...", "wave", "Camera connected. Watching for your signs.");
     } catch (err) {
       console.error("Camera access error:", err);
-      setModelError("Camera access denied or unavailable. Please grant camera permission.");
+      setModelError("Camera access denied or unavailable: " + (err.message || ""));
     }
   };
 
@@ -265,6 +287,7 @@ export default function SignAvatarAssistant({
   const stopCamera = () => {
     if (requestRef.current) {
       cancelAnimationFrame(requestRef.current);
+      requestRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -272,6 +295,10 @@ export default function SignAvatarAssistant({
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
     setCameraActive(false);
     setDetectedGesture("None");
@@ -286,9 +313,14 @@ export default function SignAvatarAssistant({
     const canvas = canvasRef.current;
     const recognizer = recognizerRef.current;
 
-    if (!video || !canvas || !recognizer) return;
+    if (!video || !canvas || !recognizer || !streamRef.current) return;
 
-    if (video.readyState >= 2) {
+    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
       if (video.currentTime !== lastVideoTimeRef.current) {
         lastVideoTimeRef.current = video.currentTime;
 
@@ -509,22 +541,23 @@ export default function SignAvatarAssistant({
           
           {/* Webcam Vision Container */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner flex items-center justify-center group">
+            {/* Always-mounted Video & Canvas Elements */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover transform -scale-x-100 ${cameraActive ? "block" : "hidden"}`}
+            />
+            <canvas
+              ref={canvasRef}
+              width={640}
+              height={480}
+              className={`absolute inset-0 w-full h-full object-cover transform -scale-x-100 pointer-events-none ${cameraActive ? "block" : "hidden"}`}
+            />
+            
             {cameraActive ? (
               <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover transform -scale-x-100"
-                />
-                <canvas
-                  ref={canvasRef}
-                  width={640}
-                  height={480}
-                  className="absolute inset-0 w-full h-full object-cover transform -scale-x-100 pointer-events-none"
-                />
-                
                 {/* Real-time Gesture Badge Overlay */}
                 <div className="absolute top-3 left-3 px-3 py-1 rounded-xl bg-slate-900/85 backdrop-blur-md border border-cyan-500/40 text-xs text-white flex items-center gap-2">
                   <span className="text-sm font-bold text-cyan-400">
@@ -547,7 +580,7 @@ export default function SignAvatarAssistant({
                 </button>
               </>
             ) : (
-              <div className="text-center p-6 flex flex-col items-center gap-3">
+              <div className="text-center p-6 flex flex-col items-center gap-3 z-10">
                 <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
                   <span className="material-symbols-outlined !text-3xl">videocam</span>
                 </div>
