@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
-import Avatar3DCanvas from "./Avatar3DCanvas";
+import HumanTeacherAvatar from "./HumanTeacherAvatar";
 
 // Supported Command Sign Mapping
 const SIGN_COMMANDS = [
@@ -11,8 +11,8 @@ const SIGN_COMMANDS = [
     icon: "☝️",
     targetTab: "courses",
     description: "Points directly to the courses catalog and learning modules",
-    avatarPose: "point_courses",
-    speechText: "Going to the courses catalog now."
+    avatarPose: "sign_ok",
+    speechText: "Understood, opening courses catalog now."
   },
   {
     gesture: "Victory",
@@ -31,7 +31,7 @@ const SIGN_COMMANDS = [
     icon: "🤟",
     targetTab: "practice",
     description: "Opens the real-time Sign Language learning & practice arena",
-    avatarPose: "sign_asl",
+    avatarPose: "sign_learn",
     speechText: "Opening the interactive ASL sign practice arena."
   },
   {
@@ -566,9 +566,9 @@ export default function SignAvatarAssistant({
                   )}
                 </div>
 
-                {/* Embedded Three.js 3D Avatar */}
+                {/* Authentic Human Teacher Avatar (Nova) */}
                 <div className="w-full h-44 relative flex items-center justify-center -my-1">
-                  <Avatar3DCanvas
+                  <HumanTeacherAvatar
                     avatarAction={avatarAction}
                     isSpeaking={isSpeaking}
                     status={avatarMood}
