@@ -347,6 +347,42 @@ export default function DeafDashboard() {
               </div>
             </div>
 
+            {/* ── 3D AI Sign Language Assistant Hero Banner ── */}
+            <div className={`p-6 rounded-3xl border ${isLight ? "bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-purple-500/10 border-cyan-200" : "bg-gradient-to-r from-cyan-950/40 via-indigo-950/40 to-slate-900/60 border-cyan-500/30"} shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 flex-shrink-0">
+                  <span className="material-symbols-outlined !text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    sign_language
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className={`text-lg font-bold tracking-tight ${textTitleClass}`}>Nova AI • 3D Sign Language Avatar</h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-600 border border-cyan-500/30">
+                      Persistent Bot
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                    Nova is now docked in the <strong>bottom-right corner across all tabs</strong>. Enable your camera anytime to sign commands (☝️ Courses, ✌️ Home, 🤟 Practice) and navigate effortlessly.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("learn-signs");
+                    navigate("/deaf/learn-signs");
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined !text-base">pan_tool</span>
+                  <span>Open Sign Arena</span>
+                </button>
+              </div>
+            </div>
+
             {/* Grid metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Daily Goal Card */}
@@ -1223,7 +1259,7 @@ export default function DeafDashboard() {
         )}
       </main>
 
-      {/* ── Persistent Floating 3D AI Sign Language Avatar (Bottom-Left Chatbot Window) ── */}
+      {/* ── Persistent Floating 3D Sign Avatar Bot (Accessible Across All Tabs) ── */}
       <SignAvatarAssistant
         isLight={isLight}
         onNavigate={(tab) => {
