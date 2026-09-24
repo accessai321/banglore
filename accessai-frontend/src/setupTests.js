@@ -14,3 +14,4 @@ jest.mock(
   }),
   { virtual: true }
 );
+jest.mock('./components/Avatar3DCanvas', () => () => null);
