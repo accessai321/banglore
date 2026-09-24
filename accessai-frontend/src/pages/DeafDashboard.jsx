@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import SignLearning from "../components/SignLearning";
+import SignAvatarAssistant from "../components/SignAvatarAssistant";
 
 
 // High-quality courses database with guaranteed embeddable YouTube links
@@ -156,6 +157,13 @@ export default function DeafDashboard() {
   // User Stats state
   const [studyStreak] = useState(7);
   const [studyMinutesToday] = useState(25);
+
+  // Ensure Voice Agent is completely muted/silent on Deaf/Mute Dashboard
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
 
   // Load backend database if possible (fallback to mock in demo/dev mode)
   useEffect(() => {
@@ -337,6 +345,33 @@ export default function DeafDashboard() {
                   <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-1">Spent Today</span>
                 </div>
               </div>
+            </div>
+
+            {/* ── 3D AI Sign Language Avatar Assistant (Nova) ── */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-xl font-bold tracking-tight ${textTitleClass}`}>AI Sign Language Assistant</h2>
+                  <p className="text-xs text-slate-500">Sign commands in front of your camera (e.g. ☝️ "Go to Courses", ✌️ "Home", 🤟 "Practice") to interact</p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                  Sign Controlled
+                </span>
+              </div>
+              <SignAvatarAssistant
+                isLight={isLight}
+                onNavigate={(tab) => {
+                  setActiveTab(tab);
+                  setSelectedCourse(null);
+                  setActiveCoursePlay(null);
+                  navigate(tab === "home" ? "/deaf" : `/deaf/${tab}`);
+                }}
+                onOpenSignPractice={() => {
+                  setActiveTab("learn-signs");
+                  navigate("/deaf/learn-signs");
+                }}
+              />
             </div>
 
             {/* Grid metrics */}
