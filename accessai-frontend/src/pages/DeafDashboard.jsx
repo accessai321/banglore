@@ -347,33 +347,6 @@ export default function DeafDashboard() {
               </div>
             </div>
 
-            {/* ── 3D AI Sign Language Avatar Assistant (Nova) ── */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className={`text-xl font-bold tracking-tight ${textTitleClass}`}>AI Sign Language Assistant</h2>
-                  <p className="text-xs text-slate-500">Sign commands in front of your camera (e.g. ☝️ "Go to Courses", ✌️ "Home", 🤟 "Practice") to interact</p>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                  Sign Controlled
-                </span>
-              </div>
-              <SignAvatarAssistant
-                isLight={isLight}
-                onNavigate={(tab) => {
-                  setActiveTab(tab);
-                  setSelectedCourse(null);
-                  setActiveCoursePlay(null);
-                  navigate(tab === "home" ? "/deaf" : `/deaf/${tab}`);
-                }}
-                onOpenSignPractice={() => {
-                  setActiveTab("learn-signs");
-                  navigate("/deaf/learn-signs");
-                }}
-              />
-            </div>
-
             {/* Grid metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Daily Goal Card */}
@@ -1249,6 +1222,21 @@ export default function DeafDashboard() {
           />
         )}
       </main>
+
+      {/* ── Persistent Floating 3D AI Sign Language Avatar (Bottom-Left Chatbot Window) ── */}
+      <SignAvatarAssistant
+        isLight={isLight}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          setSelectedCourse(null);
+          setActiveCoursePlay(null);
+          navigate(tab === "home" ? "/deaf" : `/deaf/${tab}`);
+        }}
+        onOpenSignPractice={() => {
+          setActiveTab("learn-signs");
+          navigate("/deaf/learn-signs");
+        }}
+      />
     </div>
   );
 }
