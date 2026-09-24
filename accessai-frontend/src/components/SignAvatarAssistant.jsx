@@ -37,12 +37,12 @@ const SIGN_COMMANDS = [
   {
     gesture: "Thumb_Up",
     signName: "Thumbs Up",
-    actionName: "Confirm / Select",
+    actionName: "Course Library",
     icon: "👍",
-    targetTab: "confirm",
-    description: "Confirms action or launches the highlighted course lesson",
+    targetTab: "courses",
+    description: "Takes you directly to the full ASL Course Library",
     avatarPose: "thumbs_up",
-    speechText: "Action confirmed."
+    speechText: "Opening the Course Library."
   },
   {
     gesture: "Open_Palm",
