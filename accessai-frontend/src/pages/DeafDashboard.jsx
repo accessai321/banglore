@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import SignLearning from "../components/SignLearning";
+import SignAvatarAssistant from "../components/SignAvatarAssistant";
 
 
 // High-quality courses database with guaranteed embeddable YouTube links
@@ -150,12 +151,28 @@ export default function DeafDashboard() {
   const [quizCorrect, setQuizCorrect] = useState(null);
 
 
+  // Spatial Accessibility Cursor Focus state (for sign navigation)
+  const [focusedIndex, setFocusedIndex] = useState(0);
+
+  // Auto-focus 1st item whenever tab or nested view changes
+  useEffect(() => {
+    setFocusedIndex(0);
+  }, [activeTab, selectedCourse, activeCoursePlay]);
+
+  // Contrast theme
   const [contrastTheme, setContrastTheme] = useState("light"); // light (white), dark, high-contrast
   const [pipInterpreter, setPipInterpreter] = useState(true);
 
   // User Stats state
   const [studyStreak] = useState(7);
   const [studyMinutesToday] = useState(25);
+
+  // Ensure Voice Agent is completely muted/silent on Deaf/Mute Dashboard
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
 
   // Load backend database if possible (fallback to mock in demo/dev mode)
   useEffect(() => {
@@ -339,6 +356,42 @@ export default function DeafDashboard() {
               </div>
             </div>
 
+            {/* ── 3D AI Sign Language Assistant Hero Banner ── */}
+            <div className={`p-6 rounded-3xl border ${isLight ? "bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-purple-500/10 border-cyan-200" : "bg-gradient-to-r from-cyan-950/40 via-indigo-950/40 to-slate-900/60 border-cyan-500/30"} shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 flex-shrink-0">
+                  <span className="material-symbols-outlined !text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    sign_language
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className={`text-lg font-bold tracking-tight ${textTitleClass}`}>Nova AI • 3D Sign Language Avatar</h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-600 border border-cyan-500/30">
+                      Persistent Bot
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                    Nova is now docked in the <strong>bottom-right corner across all tabs</strong>. Enable your camera anytime to sign commands (☝️ Courses, ✌️ Home, 🤟 Practice) and navigate effortlessly.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("learn-signs");
+                    navigate("/deaf/learn-signs");
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined !text-base">pan_tool</span>
+                  <span>Open Sign Arena</span>
+                </button>
+              </div>
+            </div>
+
             {/* Grid metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Daily Goal Card */}
@@ -390,11 +443,32 @@ export default function DeafDashboard() {
             <div className="flex flex-col gap-4">
               <h2 className={`text-xl font-bold tracking-tight ${textTitleClass}`}>Continue Learning</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {courses.filter(c => purchasedIds.includes(c.id)).map(course => {
+                {courses.filter(c => purchasedIds.includes(c.id)).map((course, index) => {
                   const pct = progress[course.id]?.completion || 0;
+                  const isFocused = index === focusedIndex;
                   return (
-                    <div key={course.id} className={`${cardClass} p-6 rounded-2xl flex flex-col justify-between gap-4 transition-all`}>
-                      <div>
+                    <div
+                      key={course.id}
+                      onClick={() => {
+                        setFocusedIndex(index);
+                        setActiveCoursePlay(course);
+                        setCurrentLessonIdx(0);
+                      }}
+                      className={`${cardClass} p-6 rounded-2xl flex flex-col justify-between gap-4 transition-all relative ${
+                        isFocused
+                          ? "ring-4 ring-cyan-400 ring-offset-2 ring-offset-slate-900 border-cyan-400 shadow-2xl shadow-cyan-500/30 scale-[1.02] z-20"
+                          : ""
+                      }`}
+                    >
+                      {/* Spatial Accessibility Cursor Focus Badge */}
+                      {isFocused && (
+                        <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-cyan-500/50 animate-pulse z-30">
+                          <span>👉 Focused</span>
+                          <span className="text-[9px] opacity-80">(👍 to Select)</span>
+                        </div>
+                      )}
+
+                      <div className="mt-2">
                         <span className="text-[10px] uppercase font-bold text-primary px-2 py-0.5 bg-primary/10 border border-primary/20 rounded">{course.level}</span>
                         <h3 className={`text-base font-bold mt-2 ${textTitleClass}`}>{course.title}</h3>
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{course.description}</p>
@@ -407,7 +481,9 @@ export default function DeafDashboard() {
                         <div className="h-2 bg-slate-200 rounded-full overflow-hidden mb-4">
                           <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }}></div>
                         </div>
-                        <button onClick={() => { setActiveCoursePlay(course); setCurrentLessonIdx(0); }} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl transition-all">
+                        <button onClick={() => { setActiveCoursePlay(course); setCurrentLessonIdx(0); }} className={`w-full py-2.5 text-xs font-bold rounded-xl transition-all ${
+                          isFocused ? "bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/40" : "bg-primary text-white"
+                        }`}>
                           Resume Learning
                         </button>
                       </div>
@@ -474,7 +550,7 @@ export default function DeafDashboard() {
             <div className={`${cardClass} p-4 rounded-2xl flex flex-col md:flex-row gap-4`}>
               <div className="flex-1 relative">
                 <span className="material-symbols-outlined absolute left-3 top-3 text-slate-400">search</span>
-                <input
+                <input  
                   type="text"
                   placeholder="Search courses by keyword..."
                   value={search}
@@ -500,10 +576,30 @@ export default function DeafDashboard() {
 
             {/* Courses Catalog Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {filteredCourses.map(course => {
+              {filteredCourses.map((course, index) => {
                 const isOwned = purchasedIds.includes(course.id);
+                const isFocused = index === focusedIndex;
                 return (
-                  <div key={course.id} onClick={() => setSelectedCourse(course)} className={`${cardClass} overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 rounded-2xl flex flex-col justify-between`}>
+                  <div
+                    key={course.id}
+                    onClick={() => {
+                      setFocusedIndex(index);
+                      setSelectedCourse(course);
+                    }}
+                    className={`${cardClass} overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 rounded-2xl flex flex-col justify-between relative ${
+                      isFocused
+                        ? "ring-4 ring-cyan-400 ring-offset-2 ring-offset-slate-900 border-cyan-400 shadow-2xl shadow-cyan-500/30 scale-[1.02] z-20"
+                        : ""
+                    }`}
+                  >
+                    {/* Spatial Accessibility Cursor Focus Badge */}
+                    {isFocused && (
+                      <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-cyan-500/50 animate-pulse z-30">
+                        <span>👉 Focused</span>
+                        <span className="text-[9px] opacity-80">(👍 to Select)</span>
+                      </div>
+                    )}
+
                     {/* Course Card Cover */}
                     <div className="h-36 bg-gradient-to-br from-primary/20 to-secondary/10 p-6 flex flex-col justify-between border-b border-slate-200/50">
                       <span className="self-start text-[10px] font-bold uppercase tracking-wider bg-white/70 border border-primary/20 text-primary px-2 py-0.5 rounded backdrop-blur">
@@ -529,9 +625,11 @@ export default function DeafDashboard() {
                           <span>Time: {course.duration}</span>
                         </div>
                         <button className={`w-full py-2.5 text-xs font-bold rounded-xl transition-all ${
-                          isOwned 
-                            ? "bg-slate-100 text-slate-700" 
-                            : "bg-primary text-white hover:brightness-110"
+                          isFocused
+                            ? "bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/40"
+                            : isOwned 
+                              ? "bg-slate-100 text-slate-700" 
+                              : "bg-primary text-white hover:brightness-110"
                         }`}>
                           {isOwned ? "Start Course (Owned)" : "View Details ($9.99)"}
                         </button>
@@ -555,11 +653,32 @@ export default function DeafDashboard() {
 
             {/* Courses listing */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {courses.filter(c => purchasedIds.includes(c.id)).map(course => {
+              {courses.filter(c => purchasedIds.includes(c.id)).map((course, index) => {
                 const pct = progress[course.id]?.completion || 0;
+                const isFocused = index === focusedIndex;
                 return (
-                  <div key={course.id} className={`${cardClass} p-6 rounded-2xl flex flex-col justify-between gap-4`}>
-                    <div>
+                  <div
+                    key={course.id}
+                    onClick={() => {
+                      setFocusedIndex(index);
+                      setActiveCoursePlay(course);
+                      setCurrentLessonIdx(0);
+                    }}
+                    className={`${cardClass} p-6 rounded-2xl flex flex-col justify-between gap-4 relative transition-all ${
+                      isFocused
+                        ? "ring-4 ring-cyan-400 ring-offset-2 ring-offset-slate-900 border-cyan-400 shadow-2xl shadow-cyan-500/30 scale-[1.02] z-20"
+                        : ""
+                    }`}
+                  >
+                    {/* Spatial Accessibility Cursor Focus Badge */}
+                    {isFocused && (
+                      <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-cyan-500/50 animate-pulse z-30">
+                        <span>👉 Focused</span>
+                        <span className="text-[9px] opacity-80">(👍 to Select)</span>
+                      </div>
+                    )}
+
+                    <div className="mt-2">
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
                         <span>Instructor: {course.instructor}</span>
                         <span className="text-primary">{course.level}</span>
@@ -576,7 +695,9 @@ export default function DeafDashboard() {
                       <div className="h-2 bg-slate-200 rounded-full overflow-hidden mb-4">
                         <div className="h-full bg-primary" style={{ width: `${pct}%` }}></div>
                       </div>
-                      <button onClick={() => { setActiveCoursePlay(course); setCurrentLessonIdx(0); }} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-xl transition-all">
+                      <button onClick={() => { setActiveCoursePlay(course); setCurrentLessonIdx(0); }} className={`w-full py-2.5 text-xs font-bold rounded-xl transition-all ${
+                        isFocused ? "bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/40" : "bg-primary text-white"
+                      }`}>
                         Launch Course Player
                       </button>
                     </div>
@@ -1214,6 +1335,59 @@ export default function DeafDashboard() {
           />
         )}
       </main>
+
+      {/* ── Persistent Floating 3D Sign Avatar Bot (Accessible Across All Tabs) ── */}
+      <SignAvatarAssistant
+        isLight={isLight}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          setSelectedCourse(null);
+          setActiveCoursePlay(null);
+          navigate(tab === "home" ? "/deaf" : `/deaf/${tab}`);
+        }}
+        onSelect={() => {
+          // Dynamic Spatial Sign Selection based on active screen context:
+          if (activeCoursePlay) {
+            // In course player: advance lesson or take quiz
+            if (currentLessonIdx < activeCoursePlay.lessons.length - 1) {
+              setCurrentLessonIdx(i => i + 1);
+            } else {
+              setQuizSubmitted(false);
+            }
+          } else if (selectedCourse) {
+            // In course detail view: launch or buy course
+            if (purchasedIds.includes(selectedCourse.id)) {
+              setActiveCoursePlay(selectedCourse);
+              setCurrentLessonIdx(0);
+            } else {
+              handleBuyCourse(selectedCourse.id);
+              setActiveCoursePlay(selectedCourse);
+              setCurrentLessonIdx(0);
+            }
+          } else if (activeTab === "courses") {
+            // In course catalog: select the focused course
+            const targetCourse = filteredCourses[focusedIndex] || filteredCourses[0];
+            if (targetCourse) {
+              setSelectedCourse(targetCourse);
+            }
+          } else if (activeTab === "my-learning" || activeTab === "home") {
+            // In enrolled / home view: launch focused course
+            const enrolled = courses.filter(c => purchasedIds.includes(c.id));
+            const targetCourse = enrolled[focusedIndex] || enrolled[0] || courses[0];
+            if (targetCourse) {
+              setActiveCoursePlay(targetCourse);
+              setCurrentLessonIdx(0);
+            }
+          } else if (activeTab === "learn-signs") {
+            // In sign learning: toggle camera
+            setFocusedIndex(0);
+          }
+        }}
+        onOpenSignPractice={() => {
+          setActiveTab("learn-signs");
+          navigate("/deaf/learn-signs");
+        }}
+      />
     </div>
   );
 }

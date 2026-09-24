@@ -193,6 +193,17 @@ export default function Landing() {
   const selectMode = useCallback((modeKey, playTTS = true) => {
     setSelectedWithRef(modeKey);
 
+    // If Deaf/Mute mode is chosen, cancel speech immediately and keep completely silent
+    if (modeKey === "deaf") {
+      stop();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeechBubble("Deaf / Hard of Hearing mode selected. Visual sign & caption interface active.");
+      setAgentState(STATE_IDLE);
+      return;
+    }
+
     if (playTTS) {
       const modeName = modes.find(m => m.key === modeKey)?.title;
       const replyText = `${modeName} selected. Would you like to Login or Sign Up?`;
@@ -209,7 +220,7 @@ export default function Landing() {
         }, 100);
       });
     }
-  }, [speakText, resumeListening, setSelectedWithRef, stop, setAgentState]);
+  }, [speakText, resumeListening, setSelectedWithRef, stop, setAgentState, setSpeechBubble]);
 
   const selectBlindMode = useCallback(() => {
     selectMode("blind", true);
@@ -219,13 +230,23 @@ export default function Landing() {
     selectMode("motor", true);
   }, [selectMode]);
 
+  const selectDeafMode = useCallback(() => {
+    selectMode("deaf", false);
+  }, [selectMode]);
+
   const handleLoginRedirect = useCallback(() => {
     if (!selected) return;
+    if (selected === "deaf" && typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     navigate(`/${selected}/login`);
   }, [selected, navigate]);
 
   const handleSignupRedirect = useCallback(() => {
     if (!selected) return;
+    if (selected === "deaf" && typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     navigate(`/${selected}/signup`);
   }, [selected, navigate]);
 
@@ -233,6 +254,16 @@ export default function Landing() {
     const targetMode = modeKey || selectedRef.current || selected;
     if (!targetMode) {
       setShowDemoModal(true);
+      return;
+    }
+
+    if (targetMode === "deaf") {
+      stop();
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      loginDemoUser("deaf");
+      navigate("/deaf");
       return;
     }
 
@@ -316,6 +347,9 @@ export default function Landing() {
     if (normalized === "motor" || normalized === "motor mode" || normalized.includes("motor")) {
       return "motor mode";
     }
+    if (normalized === "deaf" || normalized === "deaf mode" || normalized.includes("deaf")) {
+      return "deaf mode";
+    }
     if (normalized === "demo" || normalized === "demo mode" || normalized.includes("demo account") || normalized.includes("demo")) {
       return "demo mode";
     }
@@ -330,6 +364,9 @@ export default function Landing() {
     }
     if (normalizedText === "motor mode") {
       return { intent: "SELECT_MODE", entity: "motor", action: selectMotorMode, funcName: "selectMotorMode()" };
+    }
+    if (normalizedText === "deaf mode") {
+      return { intent: "SELECT_MODE", entity: "deaf", action: selectDeafMode, funcName: "selectDeafMode()" };
     }
     if (normalizedText === "login") {
       return { intent: "OPEN_LOGIN", entity: null, action: openLogin, funcName: "openLogin()" };
